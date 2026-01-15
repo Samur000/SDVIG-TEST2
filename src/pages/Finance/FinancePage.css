@@ -1,0 +1,556 @@
+/* Горизонтальный скролл кошельков с touch swipe */
+.wallets-scroll {
+  margin: 0 -16px 20px;
+  padding: 0 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+}
+
+.wallets-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.wallets-container {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.wallets-container > * {
+  scroll-snap-align: start;
+}
+
+.wallet-card {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  min-width: 160px;
+  background: var(--bg);
+  border: 2px solid;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wallet-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.wallet-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.wallet-card-icon .wallet-icon-svg {
+  width: 22px;
+  height: 22px;
+}
+
+.wallet-card-icon .wallet-icon-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.wallet-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wallet-card-name {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wallet-card-balance {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.wallet-add-card {
+  flex-direction: column;
+  justify-content: center;
+  border-style: dashed;
+  border-color: var(--border);
+  color: var(--muted);
+  min-width: 100px;
+}
+
+.wallet-add-card:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.wallet-add-card svg {
+  width: 24px;
+  height: 24px;
+}
+
+.wallet-add-card span {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Общий баланс по валютам */
+.total-balances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.total-balance-item {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-lg);
+}
+
+.total-balance-label {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.total-balance-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Карточка баланса (legacy) */
+.balance-card {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.balance-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.balance-label {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.balance-total {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.balance-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.balance-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: var(--radius-md);
+}
+
+.balance-item svg {
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+
+.balance-item span {
+  flex: 1;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.balance-item strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Аналитика */
+.analytics-section {
+  margin-bottom: 20px;
+}
+
+.analytics-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.analytics-cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.analytics-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.analytics-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.analytics-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.top-categories {
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.top-categories .analytics-label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.category-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.category-item span:last-child {
+  font-weight: 500;
+}
+
+/* Кнопки добавления и перевода */
+.add-transaction-btn {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.add-transaction-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.transfer-btn {
+  width: 100%;
+  margin-bottom: 24px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.transfer-btn:hover {
+  background: var(--accent-soft);
+}
+
+.transfer-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Список транзакций */
+.transactions-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.transactions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transactions-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  padding-left: 4px;
+}
+
+.transaction-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.transaction-color-indicator {
+  width: 4px;
+  height: 36px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.transaction-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.transaction-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transaction-title-row.transfer-row {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.transfer-from-part {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.transfer-from-part .transaction-category {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-to-part {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%; /* Всегда переносится на новую строку при нехватке места */
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.transfer-row .transfer-arrow {
+  flex-shrink: 0;
+  margin: 0 4px;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.transaction-wallet-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.transfer-arrow {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 4px;
+}
+
+.transaction-wallet-icon .wallet-icon-svg {
+  display: flex;
+  width: 14px;
+  height: 14px;
+}
+
+.transaction-wallet-icon .wallet-icon-img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.transaction-category {
+  font-weight: 500;
+}
+
+.transaction-wallet {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.transaction-comment {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.transaction-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.transaction-amount {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.transaction-amount.income {
+  color: var(--success);
+}
+
+.transaction-amount.expense {
+  color: var(--danger);
+}
+
+.transaction-amount.transfer {
+  color: var(--accent);
+}
+
+/* Суммы для переводов */
+.transfer-amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.transaction-amount.transfer-from {
+  color: var(--danger, #ef4444);
+  font-size: 15px;
+}
+
+.transaction-amount.transfer-to {
+  color: var(--success, #22c55e);
+  font-size: 15px;
+}
+
+.transaction-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+
+.transaction-delete:hover {
+  background: #FEF2F2;
+  color: var(--danger);
+}
+
+.transaction-delete svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Архив операций */
+.archive-section {
+  margin-top: 0;
+}
+
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+}
+
+.archive-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.archive-icon {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.2s ease;
+}
+
+.archive-icon.open {
+  transform: rotate(180deg);
+}
+
+.archive-count {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-full);
+}
+
+/* Кнопка удаления кошелька */
+.wallet-form-delete {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.wallet-form-delete .btn-danger {
+  width: 100%;
+  justify-content: center;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.wallet-form-delete .btn-danger:hover {
+  background: #FEF2F2;
+}
+
