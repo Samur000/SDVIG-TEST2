@@ -582,7 +582,7 @@ export function SettingsPage() {
       
       {/* Версия */}
       <div className="settings-version">
-        <span>СДВиГ v2.0</span>
+        <span>СДВиГ v2.1.1</span>
         <span className="settings-storage-info">Данные хранятся в IndexedDB</span>
       </div>
       
