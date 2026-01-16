@@ -9,6 +9,12 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Убираем padding-bottom от Layout.main для календаря */
+.main > .calendar-page {
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
 /* Переключение режимов */
 .calendar-mode-selector {
   display: flex;
