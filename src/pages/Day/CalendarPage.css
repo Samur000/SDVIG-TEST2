@@ -62,19 +62,17 @@
 }
 
 .calendar-week-header-day-label {
-  font-size: 9px;
+  font-size: 7px;
   color: var(--muted);
   font-weight: 500;
   text-transform: uppercase;
-  margin-bottom: 4px;
 }
 
 .calendar-week-header-day-number {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text);
   width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;

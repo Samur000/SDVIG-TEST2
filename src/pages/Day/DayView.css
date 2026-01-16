@@ -1,5 +1,6 @@
 /* Day View - вертикальная временная лента */
 .day-view {
+  margin-top: 10px;
   display: flex;
   flex-direction: row;
   height: 100%;
@@ -9,12 +10,11 @@
 /* Колонка с часами */
 .day-view-hours {
   flex-shrink: 0;
-  width: 60px;
-  padding-right: 12px;
-  padding-top: 8px;
+  padding-right: 5px;
 }
 
 .day-view-hour {
+  /* margin-top: 10px; */
   height: 60px;
   position: relative;
   display: flex;

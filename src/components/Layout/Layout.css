@@ -58,7 +58,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px;
+  padding: 5px 10px 20px;
   padding-bottom: calc(var(--nav-height) + var(--safe-area-bottom) + 30px);
 }
 

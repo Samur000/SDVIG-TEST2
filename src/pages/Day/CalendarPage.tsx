@@ -56,6 +56,26 @@ export function CalendarPage() {
       setViewDate(date);
     }
   }, [location.state]);
+
+  // Синхронизация selectedEvent с актуальным состоянием (для событий из рутин)
+  useEffect(() => {
+    if (selectedEvent?.routineId && selectedEvent.startTime) {
+      const startTime = typeof selectedEvent.startTime === 'string' 
+        ? new Date(selectedEvent.startTime) 
+        : selectedEvent.startTime;
+      const dateStr = formatDate(startTime);
+      const routine = state.routines.find(r => r.id === selectedEvent.routineId);
+      
+      if (routine) {
+        const actualCompleted = routine.completed[dateStr] || false;
+        // Обновляем только если состояние изменилось
+        if (selectedEvent.completed !== actualCompleted) {
+          setSelectedEvent(prev => prev ? { ...prev, completed: actualCompleted } : null);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.routines]);
   
   // Состояние для направления анимации
   const [animationDirection, setAnimationDirection] = useState<'prev' | 'next' | null>(null);
@@ -210,10 +230,31 @@ export function CalendarPage() {
   
   const handleToggleEvent = () => {
     if (selectedEvent) {
-      dispatch({ type: 'TOGGLE_EVENT', payload: selectedEvent.id });
-      // Обновляем selectedEvent с новым состоянием completed
-      const updatedEvent = { ...selectedEvent, completed: !selectedEvent.completed };
-      setSelectedEvent(updatedEvent);
+      // Если событие создано из рутины, используем TOGGLE_ROUTINE
+      if (selectedEvent.routineId && selectedEvent.startTime) {
+        const startTime = typeof selectedEvent.startTime === 'string' 
+          ? new Date(selectedEvent.startTime) 
+          : selectedEvent.startTime;
+        const dateStr = formatDate(startTime);
+        // Находим рутину для определения нового состояния
+        const routine = state.routines.find(r => r.id === selectedEvent.routineId);
+        const currentCompleted = routine?.completed[dateStr] || false;
+        
+        dispatch({ 
+          type: 'TOGGLE_ROUTINE', 
+          payload: { id: selectedEvent.routineId, date: dateStr } 
+        });
+        
+        // Обновляем selectedEvent с новым состоянием completed из актуальной рутины
+        const updatedEvent = { ...selectedEvent, completed: !currentCompleted };
+        setSelectedEvent(updatedEvent);
+      } else {
+        // Обычное событие
+        dispatch({ type: 'TOGGLE_EVENT', payload: selectedEvent.id });
+        // Обновляем selectedEvent с новым состоянием completed
+        const updatedEvent = { ...selectedEvent, completed: !selectedEvent.completed };
+        setSelectedEvent(updatedEvent);
+      }
     }
   };
   
