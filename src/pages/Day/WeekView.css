@@ -139,6 +139,7 @@
   flex: 1;
   position: relative;
   overflow-y: auto;
+  overflow-x: hidden;
   height: 100%;
   min-height: 1500px; /* 24 часа * 60px + 60px для 24:00 (00:00 - 00:00) */
 }
@@ -236,6 +237,7 @@
   position: absolute;
   top: 0;
   height: 1500px; /* 24 часа * 60px + 60px для 24:00 */
+  overflow: visible;
 }
 
 /* События */
@@ -257,6 +259,8 @@
   min-height: 30px; /* Минимум 30 минут */
   overflow: hidden;
   margin: 0 1px;
+  box-sizing: border-box;
+  max-width: 100%; /* Предотвращаем выход за границы колонки */
 }
 
 .week-view-event:hover {

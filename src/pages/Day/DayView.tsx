@@ -6,6 +6,7 @@ import {
   getEventTop, 
   getEventHeight,
   groupConflictingEvents,
+  eventsOverlap,
   formatTime,
   getCurrentTimePosition
 } from './CalendarUtils';
@@ -118,28 +119,68 @@ export function DayView({ date, events, onEventClick }: DayViewProps) {
         
         {/* События */}
         <div className="day-view-events">
-          {eventGroups.map((group) => {
-            const groupWidth = 100 / group.length;
-            return group.map((event, eventIndex) => {
-              // Пропускаем события без startTime/endTime (старый формат)
-              if (!event.startTime || !event.endTime) {
-                return null;
+          {(() => {
+            // Вычисляем смещения для групп, которые не должны накладываться
+            const groupTopOffsets = new Map<number, number>();
+            eventGroups.forEach((group, groupIndex) => {
+              if (group.length === 0) return;
+              const firstEvent = group[0];
+              if (!firstEvent.startTime) return;
+              const firstStartTime = typeof firstEvent.startTime === 'string' ? new Date(firstEvent.startTime) : firstEvent.startTime;
+              const firstTop = getEventTop(firstStartTime);
+              
+              // Проверяем, не накладывается ли эта группа с предыдущими
+              let offset = 0;
+              for (let i = 0; i < groupIndex; i++) {
+                const prevGroup = eventGroups[i];
+                if (prevGroup.length === 0) continue;
+                const prevFirstEvent = prevGroup[0];
+                if (!prevFirstEvent.startTime || !prevFirstEvent.endTime) continue;
+                const prevStartTime = typeof prevFirstEvent.startTime === 'string' ? new Date(prevFirstEvent.startTime) : prevFirstEvent.startTime;
+                const prevEndTime = typeof prevFirstEvent.endTime === 'string' ? new Date(prevFirstEvent.endTime) : prevFirstEvent.endTime;
+                const prevTop = getEventTop(prevStartTime);
+                const prevHeight = getEventHeight(prevStartTime, prevEndTime);
+                
+                // Если группы начинаются в одно время, но не пересекаются, смещаем текущую группу
+                if (firstTop === prevTop && !eventsOverlap(firstEvent, prevFirstEvent)) {
+                  const prevOffset = groupTopOffsets.get(i) || 0;
+                  offset = Math.max(offset, prevHeight + prevOffset);
+                }
               }
-              
-              const startTime = typeof event.startTime === 'string' ? new Date(event.startTime) : event.startTime;
-              const endTime = typeof event.endTime === 'string' ? new Date(event.endTime) : event.endTime;
-              
-              // Проверяем валидность дат
-              if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-                return null;
+              if (offset > 0) {
+                groupTopOffsets.set(groupIndex, offset);
               }
+            });
+            
+            return eventGroups.map((group, groupIndex) => {
+              // Рассчитываем позиционирование событий в группе с учетом отступов
+              const groupPadding = 0.5; // Отступ между событиями в группе (в %)
+              const totalPadding = groupPadding * (group.length - 1);
+              const availableWidth = 100 - totalPadding;
+              const eventWidth = availableWidth / group.length;
+              const groupTopOffset = groupTopOffsets.get(groupIndex) || 0;
               
-              const top = getEventTop(startTime);
-              const height = getEventHeight(startTime, endTime);
-              const left = (groupWidth * eventIndex);
-              const width = groupWidth;
-              const color = event.color || '#4285F4';
-              const isRoutine = !!event.routineId;
+              return group.map((event, eventIndex) => {
+                // Пропускаем события без startTime/endTime (старый формат)
+                if (!event.startTime || !event.endTime) {
+                  return null;
+                }
+                
+                const startTime = typeof event.startTime === 'string' ? new Date(event.startTime) : event.startTime;
+                const endTime = typeof event.endTime === 'string' ? new Date(event.endTime) : event.endTime;
+                
+                // Проверяем валидность дат
+                if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                  return null;
+                }
+                
+                const top = getEventTop(startTime) + groupTopOffset;
+                const height = getEventHeight(startTime, endTime);
+                // Рассчитываем left с учетом отступов между событиями
+                const left = eventIndex * (eventWidth + groupPadding);
+                const width = eventWidth;
+                const color = event.color || '#4285F4';
+                const isRoutine = !!event.routineId;
               
               return (
                 <div
@@ -171,8 +212,9 @@ export function DayView({ date, events, onEventClick }: DayViewProps) {
                   </div>
                 </div>
               );
-            }).filter(Boolean);
-          })}
+              }).filter(Boolean);
+            });
+          })()}
         </div>
       </div>
     </div>

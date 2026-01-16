@@ -71,6 +71,7 @@ export function getEventHeight(startTime: Date | string | undefined, endTime: Da
 }
 
 // Проверка пересечения двух событий
+// События пересекаются только если они имеют общие моменты времени (не только касаются границ)
 export function eventsOverlap(event1: Event, event2: Event): boolean {
   // Если у события нет startTime/endTime (старый формат), не считаем их пересекающимися
   if (!event1.startTime || !event1.endTime || !event2.startTime || !event2.endTime) {
@@ -87,31 +88,93 @@ export function eventsOverlap(event1: Event, event2: Event): boolean {
     return false;
   }
   
+  // События пересекаются, если одно начинается до того, как другое заканчивается,
+  // И одно заканчивается после того, как другое начинается
+  // Это означает, что у них есть общее время (не только граничная точка)
   return start1 < end2 && start2 < end1;
 }
 
 // Группировка событий по конфликтам (для отображения рядом друг с другом)
+// Используем алгоритм Union-Find для правильной группировки всех связанных событий
 export function groupConflictingEvents(events: Event[]): Event[][] {
-  const groups: Event[][] = [];
-  const used = new Set<string>();
+  if (events.length === 0) return [];
   
+  // Создаем карту родителей для Union-Find
+  const parent = new Map<string, string>();
+  const rank = new Map<string, number>();
+  
+  // Инициализация
   for (const event of events) {
-    if (used.has(event.id)) continue;
+    parent.set(event.id, event.id);
+    rank.set(event.id, 0);
+  }
+  
+  // Функция поиска корня
+  const find = (id: string): string => {
+    if (parent.get(id) !== id) {
+      parent.set(id, find(parent.get(id)!));
+    }
+    return parent.get(id)!;
+  };
+  
+  // Функция объединения
+  const union = (id1: string, id2: string) => {
+    const root1 = find(id1);
+    const root2 = find(id2);
     
-    const group = [event];
-    used.add(event.id);
+    if (root1 === root2) return;
     
-    // Находим все события, которые пересекаются с текущим
-    for (const otherEvent of events) {
-      if (used.has(otherEvent.id)) continue;
-      if (eventsOverlap(event, otherEvent)) {
-        group.push(otherEvent);
-        used.add(otherEvent.id);
+    const rank1 = rank.get(root1) || 0;
+    const rank2 = rank.get(root2) || 0;
+    
+    if (rank1 < rank2) {
+      parent.set(root1, root2);
+    } else if (rank1 > rank2) {
+      parent.set(root2, root1);
+    } else {
+      parent.set(root2, root1);
+      rank.set(root1, rank1 + 1);
+    }
+  };
+  
+  // Объединяем все пересекающиеся события
+  for (let i = 0; i < events.length; i++) {
+    for (let j = i + 1; j < events.length; j++) {
+      if (eventsOverlap(events[i], events[j])) {
+        union(events[i].id, events[j].id);
       }
     }
-    
+  }
+  
+  // Группируем события по их корням
+  const groupsMap = new Map<string, Event[]>();
+  for (const event of events) {
+    const root = find(event.id);
+    if (!groupsMap.has(root)) {
+      groupsMap.set(root, []);
+    }
+    groupsMap.get(root)!.push(event);
+  }
+  
+  // Сортируем события внутри каждой группы по времени начала
+  const groups: Event[][] = [];
+  for (const group of groupsMap.values()) {
+    group.sort((a, b) => {
+      const aStart = typeof a.startTime === 'string' ? new Date(a.startTime) : a.startTime;
+      const bStart = typeof b.startTime === 'string' ? new Date(b.startTime) : b.startTime;
+      if (!aStart || !bStart) return 0;
+      return aStart.getTime() - bStart.getTime();
+    });
     groups.push(group);
   }
+  
+  // Сортируем группы по времени начала первого события в группе
+  groups.sort((a, b) => {
+    const aStart = typeof a[0].startTime === 'string' ? new Date(a[0].startTime) : a[0].startTime;
+    const bStart = typeof b[0].startTime === 'string' ? new Date(b[0].startTime) : b[0].startTime;
+    if (!aStart || !bStart) return 0;
+    return aStart.getTime() - bStart.getTime();
+  });
   
   return groups;
 }
