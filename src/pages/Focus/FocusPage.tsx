@@ -243,16 +243,23 @@ export function FocusPage() {
     setIsRunning(true);
     setShowExtras(false);
     const now = Date.now();
-    startTimeRef.current = now;
+    
+    // Если таймер уже был запущен ранее, вычисляем новое время старта с учетом оставшегося времени
+    // Это важно для возобновления после паузы или возврата на вкладку
+    const totalDuration = getDuration(mode);
+    const adjustedStartTime = now - (totalDuration - timeLeft) * 1000;
+    startTimeRef.current = adjustedStartTime;
+    
     sessionSavedRef.current = false;
-    saveTimerState(true, now);
-  }, [saveTimerState, playAudioFile, unlockAudio]);
+    saveTimerState(true, adjustedStartTime);
+  }, [saveTimerState, playAudioFile, unlockAudio, mode, timeLeft, getDuration]);
   
   // Пауза
   const handlePause = useCallback(() => {
     playAudioFile(pauseAudioRef);
     setIsRunning(false);
     setShowExtras(true);
+    // При паузе не сбрасываем startTimeRef, чтобы при возобновлении продолжить с правильного времени
     saveTimerState(false);
   }, [saveTimerState, playAudioFile]);
   
@@ -475,18 +482,24 @@ export function FocusPage() {
     }
   };
   
-  // Тик таймера
+  // Тик таймера - используем реальное время вместо уменьшения на 1
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
+    if (isRunning && timeLeft > 0 && startTimeRef.current > 0) {
+      const totalDuration = getDuration(mode);
+      
       intervalRef.current = window.setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            handleTimerComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+        // Вычисляем оставшееся время на основе реального времени, а не количества тиков
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTimeRef.current) / 1000);
+        const remaining = Math.max(0, totalDuration - elapsed);
+        
+        if (remaining <= 0) {
+          handleTimerComplete();
+          setTimeLeft(0);
+        } else {
+          setTimeLeft(remaining);
+        }
+      }, 100); // Проверяем каждые 100мс для более плавного отображения
     }
     
     return () => {
@@ -494,7 +507,7 @@ export function FocusPage() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, handleTimerComplete]);
+  }, [isRunning, handleTimerComplete, mode, getDuration]);
   
   // Обновление title страницы
   useEffect(() => {
