@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Event, EVENT_COLORS, EVENT_COLOR_DEFAULT } from '../../types';
 import { v4 as uuid } from 'uuid';
 import { formatDate } from '../../utils/date';
+import { vibrate } from '../../utils/feedback';
 import './Forms.css';
 
 interface EventFormProps {
@@ -150,6 +151,11 @@ export function EventForm({ event, defaultDate, onSave, onCancel }: EventFormPro
     e.preventDefault();
     if (!title.trim() || !date) return;
     if (startTime >= endTime) return;
+    
+    // Вибрация при создании нового события (вызываем синхронно при клике для iOS)
+    if (!event) {
+      vibrate([10, 30, 10]);
+    }
     
     onSave({
       id: event?.id || uuid(),

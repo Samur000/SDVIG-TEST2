@@ -4,7 +4,6 @@ import { Layout } from '../../components/Layout';
 import { useApp } from '../../store/AppContext';
 import { Event } from '../../types';
 import { generateEventsFromRoutine } from '../../utils/routineEvents';
-import { vibrate } from '../../utils/feedback';
 import {
   formatDate,
   getDayName,
@@ -272,8 +271,7 @@ export function CalendarPage() {
       dispatch({ type: 'UPDATE_EVENT', payload: event });
     } else {
       dispatch({ type: 'ADD_EVENT', payload: event });
-      // Вибрация при создании нового события
-      vibrate([10, 30, 10]);
+      // Вибрация теперь вызывается в EventForm при клике на кнопку для лучшей поддержки iOS
     }
     setShowEventForm(false);
     setEditingEvent(null);
