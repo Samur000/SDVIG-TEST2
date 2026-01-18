@@ -112,16 +112,22 @@ export function FocusPage() {
     
     [startAudioRef, pauseAudioRef, stopAudioRef].forEach(ref => {
       if (ref.current) {
-        // Воспроизводим тихо для разблокировки
-        ref.current.volume = 0.01;
+        // Полностью беззвучная разблокировка
+        ref.current.muted = true;
+        ref.current.volume = 0;
         ref.current.play().then(() => {
           ref.current?.pause();
           if (ref.current) {
             ref.current.currentTime = 0;
+            ref.current.muted = false;
             ref.current.volume = 0.7;
           }
         }).catch(() => {
           // Игнорируем ошибки разблокировки
+          if (ref.current) {
+            ref.current.muted = false;
+            ref.current.volume = 0.7;
+          }
         });
       }
     });
