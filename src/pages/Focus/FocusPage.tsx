@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { useApp } from '../../store/AppContext';
 import { saveStateAsync } from '../../store/storage';
+import { vibrate } from '../../utils/feedback';
 import { TimerMode } from '../../types';
 import { v4 as uuid } from 'uuid';
 import startSoundSrc from './audio/start.mp3';
@@ -74,36 +75,58 @@ export function FocusPage() {
   const startAudioRef = useRef<HTMLAudioElement | null>(null);
   const pauseAudioRef = useRef<HTMLAudioElement | null>(null);
   const stopAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUnlockedRef = useRef(false);
   
   // Инициализация аудио элементов при монтировании
   useEffect(() => {
+    // Создаем аудио элементы
     startAudioRef.current = new Audio(startSoundSrc);
-    startAudioRef.current.volume = 0.7;
-    startAudioRef.current.preload = 'auto';
-    
     pauseAudioRef.current = new Audio(pauseSoundSrc);
-    pauseAudioRef.current.volume = 0.7;
-    pauseAudioRef.current.preload = 'auto';
-    
     stopAudioRef.current = new Audio(stopSoundSrc);
-    stopAudioRef.current.volume = 0.7;
-    stopAudioRef.current.preload = 'auto';
+    
+    // Настраиваем все аудио
+    [startAudioRef, pauseAudioRef, stopAudioRef].forEach(ref => {
+      if (ref.current) {
+        ref.current.volume = 0.7;
+        ref.current.preload = 'auto';
+        // Загружаем аудио
+        ref.current.load();
+      }
+    });
     
     return () => {
       // Очистка при размонтировании
-      if (startAudioRef.current) {
-        startAudioRef.current.pause();
-        startAudioRef.current = null;
-      }
-      if (pauseAudioRef.current) {
-        pauseAudioRef.current.pause();
-        pauseAudioRef.current = null;
-      }
-      if (stopAudioRef.current) {
-        stopAudioRef.current.pause();
-        stopAudioRef.current = null;
-      }
+      [startAudioRef, pauseAudioRef, stopAudioRef].forEach(ref => {
+        if (ref.current) {
+          ref.current.pause();
+          ref.current.src = '';
+          ref.current = null;
+        }
+      });
     };
+  }, []);
+  
+  // Разблокировка аудио на iOS (вызывается при первом клике пользователя)
+  const unlockAudio = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+    
+    [startAudioRef, pauseAudioRef, stopAudioRef].forEach(ref => {
+      if (ref.current) {
+        // Воспроизводим тихо для разблокировки
+        ref.current.volume = 0.01;
+        ref.current.play().then(() => {
+          ref.current?.pause();
+          if (ref.current) {
+            ref.current.currentTime = 0;
+            ref.current.volume = 0.7;
+          }
+        }).catch(() => {
+          // Игнорируем ошибки разблокировки
+        });
+      }
+    });
+    
+    audioUnlockedRef.current = true;
   }, []);
   
   // Refs для актуальных значений при сохранении
@@ -159,7 +182,12 @@ export function FocusPage() {
   };
   
   // Воспроизведение звука из предзагруженного файла
-  const playAudioFile = useCallback((audioRef: React.MutableRefObject<HTMLAudioElement | null>) => {
+  const playAudioFile = useCallback((audioRef: React.MutableRefObject<HTMLAudioElement | null>, withVibration = false) => {
+    // Вибрация как дополнительный сигнал
+    if (withVibration) {
+      vibrate([100, 50, 100, 50, 100]);
+    }
+    
     if (!audioRef.current) return;
     
     try {
@@ -167,30 +195,21 @@ export function FocusPage() {
       
       // Сбрасываем на начало для повторного воспроизведения
       audio.currentTime = 0;
+      audio.volume = 0.7;
       
       // Пытаемся воспроизвести
       const playPromise = audio.play();
       
       if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            // Звук успешно воспроизведен
-          })
-          .catch((e) => {
-            console.warn('Не удалось воспроизвести звук:', e);
-            // Пытаемся еще раз через небольшую задержку
-            setTimeout(() => {
-              if (audioRef.current) {
-                audioRef.current.currentTime = 0;
-                audioRef.current.play().catch((err) => {
-                  console.warn('Повторная попытка воспроизведения не удалась:', err);
-                });
-              }
-            }, 100);
-          });
+        playPromise.catch((e) => {
+          console.warn('Не удалось воспроизвести звук:', e);
+          // Если звук не воспроизвелся - вибрируем
+          vibrate([100, 50, 100]);
+        });
       }
     } catch (e) {
       console.warn('Ошибка воспроизведения звука:', e);
+      vibrate([100, 50, 100]);
     }
   }, []);
   
@@ -211,6 +230,9 @@ export function FocusPage() {
   
   // Старт таймера
   const handleStart = useCallback(() => {
+    // Разблокируем аудио при первом клике (важно для iOS)
+    unlockAudio();
+    
     playAudioFile(startAudioRef);
     setIsRunning(true);
     setShowExtras(false);
@@ -218,7 +240,7 @@ export function FocusPage() {
     startTimeRef.current = now;
     sessionSavedRef.current = false;
     saveTimerState(true, now);
-  }, [saveTimerState, playAudioFile]);
+  }, [saveTimerState, playAudioFile, unlockAudio]);
   
   // Пауза
   const handlePause = useCallback(() => {
@@ -361,7 +383,8 @@ export function FocusPage() {
     setIsRunning(false);
     setShowExtras(true);
     // Воспроизводим звук завершения (для всех режимов: focus, shortBreak, longBreak)
-    playAudioFile(stopAudioRef);
+    // withVibration=true - вибрация как резервный сигнал, если звук не воспроизведётся
+    playAudioFile(stopAudioRef, true);
     
     if (mode === 'focus') {
       const newSession = {
