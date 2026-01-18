@@ -138,7 +138,7 @@
 .week-view-content {
   flex: 1;
   position: relative;
-  overflow-y: auto;
+  overflow-y: hidden;
   overflow-x: hidden;
   height: 100%;
   min-height: 1500px; /* 24 часа * 60px + 60px для 24:00 (00:00 - 00:00) */
