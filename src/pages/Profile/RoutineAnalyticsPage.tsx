@@ -25,17 +25,26 @@ const DAY_SHORT: DayOfWeek[] = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 
 function getDayNameDativePlural(day: DayOfWeek): string {
   // Правила склонения для дательного падежа множественного числа
   // Каждый день имеет своё правильное окончание
-  if (day === 'пн') return 'понедельникам';
-  if (day === 'вт') return 'вторникам';
-  if (day === 'ср') return 'средам';
-  if (day === 'чт') return 'четвергам';
-  if (day === 'пт') return 'пятницам';
-  if (day === 'сб') return 'субботам';
-  if (day === 'вс') return 'воскресеньям';
-  
-  // Fallback на случай изменения структуры
-  const dayName = DAY_NAMES[day];
-  return dayName.toLowerCase() + 'ам';
+  switch (day) {
+    case 'пн':
+      return 'понедельникам';
+    case 'вт':
+      return 'вторникам';
+    case 'ср':
+      return 'средам';
+    case 'чт':
+      return 'четвергам';
+    case 'пт':
+      return 'пятницам';
+    case 'сб':
+      return 'субботам';
+    case 'вс':
+      return 'воскресеньям';
+    default:
+      // Fallback на случай изменения структуры
+      const dayName = DAY_NAMES[day as DayOfWeek];
+      return dayName.toLowerCase() + 'ам';
+  }
 }
 
 // Получаем статус рутины по проценту

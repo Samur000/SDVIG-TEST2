@@ -29,12 +29,6 @@ export function Modal({
   // Используем onRequestClose если есть, иначе onClose
   const handleClose = onRequestClose || onClose;
   
-  // Для закрытия модалки подтверждения всегда используем onClose напрямую
-  const handleConfirmClose = () => {
-    setShowDiscardConfirm(false);
-    onClose();
-  };
-  
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';

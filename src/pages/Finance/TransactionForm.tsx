@@ -1,9 +1,8 @@
-import React, { useState, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Transaction, Wallet, CURRENCY_SYMBOLS } from '../../types';
 import { getToday } from '../../utils/date';
 import { v4 as uuid } from 'uuid';
 import { WalletIconSVG } from './WalletForm';
-import { useFormChanges } from '../../hooks/useFormChanges';
 import './TransactionForm.css';
 
 interface TransactionFormProps {
