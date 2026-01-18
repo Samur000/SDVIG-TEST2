@@ -108,12 +108,6 @@ function formatLocalDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-// Получение дня недели из даты
-function getDayOfWeekFromDate(date: Date): DayOfWeek {
-  const days: DayOfWeek[] = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-  return days[date.getDay()] as DayOfWeek;
-}
-
 // Парсинг времени из строки рутины
 function parseRoutineTime(timeStr: string, durationMinutes: number = 60): { startHour: number; startMinute: number; endHour: number; endMinute: number } {
   if (timeStr.includes('-')) {
