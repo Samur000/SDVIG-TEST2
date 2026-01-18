@@ -73,8 +73,20 @@ export function generateEventsFromRoutine(
       })
   );
   
+  // Определяем минимальную дату для генерации событий
+  // Если у рутины есть createdAt, не генерируем события раньше этой даты
+  let minDate = new Date(startDate);
+  minDate.setHours(0, 0, 0, 0);
+  
+  if (routine.createdAt) {
+    const createdAtDate = new Date(routine.createdAt + 'T00:00:00');
+    if (!isNaN(createdAtDate.getTime()) && createdAtDate > minDate) {
+      minDate = createdAtDate;
+    }
+  }
+  
   // Проходим по всем дням в диапазоне
-  const current = new Date(startDate);
+  const current = new Date(minDate);
   current.setHours(0, 0, 0, 0);
   
   while (current <= endDate) {

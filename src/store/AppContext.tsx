@@ -25,9 +25,11 @@ import {
   StartPageMode,
   AppPage,
   Settings,
-  migrateWallets
+  migrateWallets,
+  DayOfWeek
   } from '../types';
   import { initStorage, saveStateAsync } from './storage';
+  import { v4 as uuid } from 'uuid';
 
 // Флаг для показа модалки установки PWA (показывается один раз)
 const INSTALL_PROMPT_SHOWN_FLAG = 'sdvig_install_prompt_shown';
@@ -106,6 +108,90 @@ function formatLocalDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// Получение дня недели из даты
+function getDayOfWeekFromDate(date: Date): DayOfWeek {
+  const days: DayOfWeek[] = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  return days[date.getDay()] as DayOfWeek;
+}
+
+// Парсинг времени из строки рутины
+function parseRoutineTime(timeStr: string, durationMinutes: number = 60): { startHour: number; startMinute: number; endHour: number; endMinute: number } {
+  if (timeStr.includes('-')) {
+    const [start, end] = timeStr.split('-').map(t => t.trim());
+    const [startHour, startMinute] = start.split(':').map(Number);
+    const [endHour, endMinute] = end.split(':').map(Number);
+    return { startHour, startMinute, endHour, endMinute };
+  } else {
+    const [hour, minute] = timeStr.split(':').map(Number);
+    const endTime = new Date();
+    endTime.setHours(hour, minute, 0, 0);
+    endTime.setMinutes(endTime.getMinutes() + durationMinutes);
+    return { 
+      startHour: hour, 
+      startMinute: minute, 
+      endHour: endTime.getHours(), 
+      endMinute: endTime.getMinutes() 
+    };
+  }
+}
+
+// Генерация прошедших событий из рутины (до сегодня)
+function generatePastEventsFromRoutine(routine: Routine): Event[] {
+  const events: Event[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Получаем все даты, когда рутина была выполнена
+  const completedDates = Object.keys(routine.completed).filter(dateStr => routine.completed[dateStr]);
+  
+  if (completedDates.length === 0) return events;
+  
+  // Парсим время рутины
+  const durationMinutes = routine.duration && routine.duration >= 10 ? routine.duration : 60;
+  let startHour = 9, startMinute = 0, endHour = 10, endMinute = 0;
+  
+  if (routine.time) {
+    const time = parseRoutineTime(routine.time, durationMinutes);
+    startHour = time.startHour;
+    startMinute = time.startMinute;
+    endHour = time.endHour;
+    endMinute = time.endMinute;
+  }
+  
+  // Создаем события для всех прошедших выполненных дат
+  for (const dateStr of completedDates) {
+    const eventDate = new Date(dateStr + 'T00:00:00');
+    if (isNaN(eventDate.getTime())) continue;
+    
+    // Пропускаем будущие даты
+    if (eventDate >= today) continue;
+    
+    const startTime = new Date(eventDate);
+    startTime.setHours(startHour, startMinute, 0, 0);
+    
+    const endTime = new Date(eventDate);
+    endTime.setHours(endHour, endMinute, 0, 0);
+    
+    if (endTime < startTime) {
+      endTime.setDate(endTime.getDate() + 1);
+    }
+    
+    events.push({
+      id: uuid(),
+      title: routine.title,
+      description: routine.description,
+      startTime: startTime,
+      endTime: endTime,
+      color: '#9C27B0',
+      icon: routine.icon,
+      completed: true // Раз было выполнено
+      // Без routineId - теперь это обычное событие
+    });
+  }
+  
+  return events;
+}
+
 // Вспомогательная функция для расчёта streak
 function calculateHabitStreak(records: string[]): number {
   if (!Array.isArray(records) || records.length === 0) return 0;
@@ -171,8 +257,23 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         routines: state.routines.map(r => r.id === action.payload.id ? action.payload : r)
       };
-    case 'DELETE_ROUTINE':
+    case 'DELETE_ROUTINE': {
+      // Находим рутину для сохранения прошедших событий
+      const routineToDelete = state.routines.find(r => r.id === action.payload);
+      
+      if (routineToDelete) {
+        // Генерируем прошедшие события из рутины (до сегодня)
+        const pastEvents = generatePastEventsFromRoutine(routineToDelete);
+        
+        return { 
+          ...state, 
+          routines: state.routines.filter(r => r.id !== action.payload),
+          events: [...state.events, ...pastEvents]
+        };
+      }
+      
       return { ...state, routines: state.routines.filter(r => r.id !== action.payload) };
+    }
     case 'TOGGLE_ROUTINE':
       return {
         ...state,

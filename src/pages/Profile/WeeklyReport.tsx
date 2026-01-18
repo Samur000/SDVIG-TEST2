@@ -567,7 +567,7 @@ export function WeeklyReport() {
       <div className="ring-cards-scroll">
         <div className="ring-cards">
           {/* Задачи */}
-          <div className="ring-card" onClick={() => setShowTaskForm(true)}>
+          <div className="ring-card" onClick={() => navigate('/tasks')}>
             <div className="ring-container">
               <ProgressRing percent={tasksData.percent} color="#2186b4" animate={loaded} />
               <div className="ring-icon" style={{ color: '#2186b4' }}>

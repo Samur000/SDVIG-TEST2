@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Routine, DayOfWeek } from '../../types';
 import { v4 as uuid } from 'uuid';
+import { formatDate } from '../../utils/date';
+import { vibrate } from '../../utils/feedback';
 import './Forms.css';
 
 interface RoutineFormProps {
@@ -31,6 +33,11 @@ export function RoutineForm({ routine, onSave, onCancel }: RoutineFormProps) {
     if (!title.trim() || days.length === 0) return;
     if (duration < 10) return; // Минимум 10 минут
     
+    // Вибрация при создании новой рутины
+    if (!routine) {
+      vibrate([10, 30, 10]);
+    }
+    
     onSave({
       id: routine?.id || uuid(),
       title: title.trim(),
@@ -38,7 +45,9 @@ export function RoutineForm({ routine, onSave, onCancel }: RoutineFormProps) {
       time: time || undefined,
       duration: duration >= 10 ? duration : 30,
       days,
-      completed: routine?.completed || {}
+      completed: routine?.completed || {},
+      // При создании новой рутины устанавливаем дату создания
+      createdAt: routine?.createdAt || formatDate(new Date())
     });
   };
   

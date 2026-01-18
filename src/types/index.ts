@@ -10,6 +10,7 @@ export interface Routine {
   days: DayOfWeek[];
   icon?: string;
   completed: Record<string, boolean>; // дата -> выполнено
+  createdAt?: string; // Дата создания рутины (YYYY-MM-DD) - события генерируются только с этой даты
 }
 
 export interface Event {
