@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
 import { Checkbox, EmptyState, useToast } from '../../components/UI';
@@ -7,7 +7,7 @@ import { Task, Habit } from '../../types';
 import { getToday } from '../../utils/date';
 import { vibrate, getRandomMotivation } from '../../utils/feedback';
 import { v4 as uuid } from 'uuid';
-import { TaskForm } from './TaskForm';
+import { TaskForm, TaskFormHandle } from './TaskForm';
 import { BreakdownModal } from './BreakdownModal';
 import { HabitCard, CreateHabitModal } from './habits';
 import './TasksPage.css';
@@ -25,6 +25,8 @@ export function TasksPage() {
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
+  const taskFormRef = useRef<TaskFormHandle>(null);
+  const [taskFormHasChanges, setTaskFormHasChanges] = useState(false);
   
   const today = getToday();
   
@@ -482,13 +484,39 @@ export function TasksPage() {
       {/* Модалки */}
       <Modal 
         isOpen={showTaskForm} 
-        onClose={() => { setShowTaskForm(false); setEditingTask(null); }}
+        onClose={() => { 
+          setShowTaskForm(false); 
+          setEditingTask(null);
+          setTaskFormHasChanges(false);
+        }}
+        onRequestClose={() => {
+          if (taskFormRef.current?.hasChanges) {
+            setTaskFormHasChanges(true);
+            return;
+          }
+          setShowTaskForm(false);
+          setEditingTask(null);
+        }}
+        hasChanges={taskFormHasChanges}
+        onSave={() => {
+          if (taskFormRef.current) {
+            taskFormRef.current.save();
+          }
+        }}
+        confirmMessage="задачи"
         title={editingTask ? 'Редактировать задачу' : 'Новая задача'}
       >
         <TaskForm
+          ref={taskFormRef}
           task={editingTask}
-          onSave={handleSaveTask}
-          onCancel={() => { setShowTaskForm(false); setEditingTask(null); }}
+          onChangesChange={setTaskFormHasChanges}
+          onSave={(task) => {
+            handleSaveTask(task);
+            setShowTaskForm(false);
+            setEditingTask(null);
+            setTaskFormHasChanges(false);
+          }}
+          onCancel={() => { setShowTaskForm(false); setEditingTask(null); setTaskFormHasChanges(false); }}
         />
       </Modal>
       

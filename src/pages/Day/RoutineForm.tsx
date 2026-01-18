@@ -1,24 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Routine, DayOfWeek } from '../../types';
 import { v4 as uuid } from 'uuid';
 import { formatDate } from '../../utils/date';
 import { vibrate } from '../../utils/feedback';
+import { useFormChanges } from '../../hooks/useFormChanges';
 import './Forms.css';
 
 interface RoutineFormProps {
   routine: Routine | null;
   onSave: (routine: Routine) => void;
   onCancel: () => void;
+  onChangesChange?: (hasChanges: boolean) => void;
+}
+
+export interface RoutineFormHandle {
+  hasChanges: boolean;
+  save: () => void;
 }
 
 const ALL_DAYS: DayOfWeek[] = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
-export function RoutineForm({ routine, onSave, onCancel }: RoutineFormProps) {
+export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ routine, onSave, onCancel, onChangesChange }, ref) => {
   const [title, setTitle] = useState(routine?.title || '');
   const [description, setDescription] = useState(routine?.description || '');
   const [time, setTime] = useState(routine?.time || '');
   const [duration, setDuration] = useState<number>(routine?.duration || 30);
   const [days, setDays] = useState<DayOfWeek[]>(routine?.days || ALL_DAYS);
+  
+  // Отслеживание изменений
+  const initialValue = useMemo(() => {
+    if (routine) {
+      return {
+        title: routine.title,
+        description: routine.description || '',
+        time: routine.time || '',
+        duration: routine.duration || 30,
+        days: routine.days
+      };
+    } else {
+      return {
+        title: '',
+        description: '',
+        time: '',
+        duration: 30,
+        days: ALL_DAYS
+      };
+    }
+  }, [routine]);
+  
+  const { hasChanges } = useFormChanges(
+    initialValue,
+    () => ({
+      title,
+      description,
+      time,
+      duration,
+      days: [...days].sort()
+    }),
+    (a, b) => {
+      return a.title === b.title &&
+        a.description === b.description &&
+        a.time === b.time &&
+        a.duration === b.duration &&
+        JSON.stringify([...a.days].sort()) === JSON.stringify([...b.days].sort());
+    }
+  );
+  
+  // Уведомление родителя об изменениях
+  useEffect(() => {
+    if (onChangesChange) {
+      onChangesChange(hasChanges);
+    }
+  }, [hasChanges, onChangesChange]);
   
   const handleToggleDay = (day: DayOfWeek) => {
     if (days.includes(day)) {
@@ -28,8 +81,7 @@ export function RoutineForm({ routine, onSave, onCancel }: RoutineFormProps) {
     }
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     if (!title.trim() || days.length === 0) return;
     if (duration < 10) return; // Минимум 10 минут
     
@@ -49,6 +101,17 @@ export function RoutineForm({ routine, onSave, onCancel }: RoutineFormProps) {
       // При создании новой рутины устанавливаем дату создания
       createdAt: routine?.createdAt || formatDate(new Date())
     });
+  };
+  
+  // Экспорт hasChanges и save через ref
+  useImperativeHandle(ref, () => ({
+    hasChanges,
+    save: handleSave
+  }), [hasChanges, title, description, time, duration, days]);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSave();
   };
   
   return (
@@ -121,18 +184,11 @@ export function RoutineForm({ routine, onSave, onCancel }: RoutineFormProps) {
       </div>
       
       <div className="form-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+        <button type="button" className="btn text-danger" onClick={onCancel}>
           Отмена
-        </button>
-        <button 
-          type="submit" 
-          className="btn btn-primary filled"
-          disabled={!title.trim() || days.length === 0}
-        >
-          Сохранить
         </button>
       </div>
     </form>
   );
-}
+});
 

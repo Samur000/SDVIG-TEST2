@@ -1,17 +1,45 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Document } from '../../types';
 import { v4 as uuid } from 'uuid';
+import { useFormChanges } from '../../hooks/useFormChanges';
 import './Forms.css';
 
 interface DocumentFormProps {
   onSave: (doc: Document) => void;
   onCancel: () => void;
+  onChangesChange?: (hasChanges: boolean) => void;
 }
 
-export function DocumentForm({ onSave, onCancel }: DocumentFormProps) {
+export interface DocumentFormHandle {
+  hasChanges: boolean;
+  save: () => void;
+}
+
+export const DocumentForm = forwardRef<DocumentFormHandle, DocumentFormProps>(({ onSave, onCancel, onChangesChange }, ref) => {
   const [name, setName] = useState('');
   const [imageBase64, setImageBase64] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Отслеживание изменений
+  const initialValue = useMemo(() => ({
+    name: '',
+    imageBase64: undefined as string | undefined
+  }), []);
+  
+  const { hasChanges } = useFormChanges(
+    initialValue,
+    () => ({
+      name,
+      imageBase64
+    })
+  );
+  
+  // Уведомление родителя об изменениях
+  useEffect(() => {
+    if (onChangesChange) {
+      onChangesChange(hasChanges);
+    }
+  }, [hasChanges, onChangesChange]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -30,8 +58,7 @@ export function DocumentForm({ onSave, onCancel }: DocumentFormProps) {
     reader.readAsDataURL(file);
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     if (!name.trim()) return;
     
     onSave({
@@ -39,6 +66,17 @@ export function DocumentForm({ onSave, onCancel }: DocumentFormProps) {
       name: name.trim(),
       imageBase64
     });
+  };
+  
+  // Экспорт hasChanges и save через ref
+  useImperativeHandle(ref, () => ({
+    hasChanges,
+    save: handleSave
+  }), [hasChanges, name, imageBase64]);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSave();
   };
   
   return (
@@ -95,18 +133,11 @@ export function DocumentForm({ onSave, onCancel }: DocumentFormProps) {
       </div>
       
       <div className="form-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+        <button type="button" className="btn text-danger" onClick={onCancel}>
           Отмена
-        </button>
-        <button 
-          type="submit" 
-          className="btn btn-primary filled"
-          disabled={!name.trim()}
-        >
-          Сохранить
         </button>
       </div>
     </form>
   );
-}
+});
 

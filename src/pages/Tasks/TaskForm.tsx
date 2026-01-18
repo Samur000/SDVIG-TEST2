@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Task, TaskPriority, TaskTimeEstimate } from '../../types';
 import { getToday } from '../../utils/date';
 import { v4 as uuid } from 'uuid';
+import { useFormChanges } from '../../hooks/useFormChanges';
 import './Forms.css';
 
 interface TaskFormProps {
   task: Task | null;
   onSave: (task: Task) => void;
   onCancel: () => void;
+  onChangesChange?: (hasChanges: boolean) => void;
+}
+
+export interface TaskFormHandle {
+  hasChanges: boolean;
+  save: () => void;
 }
 
 const TIME_ESTIMATES: { value: TaskTimeEstimate; label: string }[] = [
@@ -18,14 +25,49 @@ const TIME_ESTIMATES: { value: TaskTimeEstimate; label: string }[] = [
   { value: 60, label: '1 час' },
 ];
 
-export function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
+export const TaskForm = forwardRef<TaskFormHandle, TaskFormProps>(({ task, onSave, onCancel, onChangesChange }, ref) => {
   const [title, setTitle] = useState(task?.title || '');
   const [date, setDate] = useState(task?.date || '');
   const [priority, setPriority] = useState<TaskPriority>(task?.priority || 'normal');
   const [timeEstimate, setTimeEstimate] = useState<TaskTimeEstimate>(task?.timeEstimate || null);
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Отслеживание изменений
+  const initialValue = useMemo(() => {
+    if (task) {
+      return {
+        title: task.title,
+        date: task.date || '',
+        priority: task.priority || 'normal',
+        timeEstimate: task.timeEstimate || null
+      };
+    } else {
+      return {
+        title: '',
+        date: '',
+        priority: 'normal' as TaskPriority,
+        timeEstimate: null as TaskTimeEstimate
+      };
+    }
+  }, [task]);
+  
+  const { hasChanges } = useFormChanges(
+    initialValue,
+    () => ({
+      title,
+      date,
+      priority,
+      timeEstimate
+    })
+  );
+  
+  // Уведомление родителя об изменениях
+  useEffect(() => {
+    if (onChangesChange) {
+      onChangesChange(hasChanges);
+    }
+  }, [hasChanges, onChangesChange]);
+  
+  const handleSave = () => {
     if (!title.trim()) return;
     
     onSave({
@@ -38,6 +80,17 @@ export function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
       parentId: task?.parentId,
       createdAt: task?.createdAt || new Date().toISOString()
     });
+  };
+  
+  // Экспорт hasChanges и save через ref
+  useImperativeHandle(ref, () => ({
+    hasChanges,
+    save: handleSave
+  }), [hasChanges, title, date, priority, timeEstimate]);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSave();
   };
   
   return (
@@ -101,18 +154,11 @@ export function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
       </div>
       
       <div className="form-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+        <button type="button" className="btn text-danger" onClick={onCancel}>
           Отмена
-        </button>
-        <button 
-          type="submit" 
-          className="btn btn-primary filled"
-          disabled={!title.trim()}
-        >
-          Сохранить
         </button>
       </div>
     </form>
   );
-}
+});
 

@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Transaction, Wallet, CURRENCY_SYMBOLS } from '../../types';
 import { getToday } from '../../utils/date';
 import { v4 as uuid } from 'uuid';
 import { WalletIconSVG } from './WalletForm';
+import { useFormChanges } from '../../hooks/useFormChanges';
 import './TransactionForm.css';
 
 interface TransactionFormProps {
@@ -13,11 +14,17 @@ interface TransactionFormProps {
   onAddCategory: (category: string) => void;
   isOpen?: boolean;
   initialTab?: 'expense' | 'income' | 'transfer';
+  onChangesChange?: (hasChanges: boolean) => void;
+}
+
+export interface TransactionFormHandle {
+  hasChanges: boolean;
+  save: () => void;
 }
 
 type TabType = 'expense' | 'income' | 'transfer';
 
-export function TransactionForm({ wallets, categories, onSave, onCancel, onAddCategory, isOpen = true, initialTab = 'expense' }: TransactionFormProps) {
+export const TransactionForm = forwardRef<TransactionFormHandle, TransactionFormProps>(({ wallets, categories, onSave, onCancel, onAddCategory, isOpen = true, initialTab = 'expense', onChangesChange }, ref) => {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [amount, setAmount] = useState('');
   const [walletId, setWalletId] = useState(wallets[0]?.id || '');
@@ -30,6 +37,78 @@ export function TransactionForm({ wallets, categories, onSave, onCancel, onAddCa
   // Поля для переводов
   const [toWalletId, setToWalletId] = useState(wallets[1]?.id || wallets[0]?.id || '');
   const [exchangeRate, setExchangeRate] = useState('');
+  
+  // Отслеживание изменений - используем ref для начального значения
+  const initialValueRef = useRef<{
+    activeTab: TabType;
+    amount: string;
+    walletId: string;
+    category: string;
+    newCategory: string;
+    date: string;
+    comment: string;
+    toWalletId: string;
+    exchangeRate: string;
+  } | null>(null);
+  
+  // Обновляем начальное значение при открытии модалки
+  useEffect(() => {
+    if (isOpen) {
+      if (!initialValueRef.current) {
+        // Сбрасываем форму при открытии
+        setAmount('');
+        setWalletId(wallets[0]?.id || '');
+        setCategory(categories[0] || '');
+        setNewCategory('');
+        setDate(getToday());
+        setComment('');
+        setToWalletId(wallets[1]?.id || wallets[0]?.id || '');
+        setExchangeRate('');
+        setActiveTab(initialTab);
+        setShowNewCategory(false);
+        
+        // Устанавливаем начальное значение после сброса
+        setTimeout(() => {
+          initialValueRef.current = {
+            activeTab: initialTab,
+            amount: '',
+            walletId: wallets[0]?.id || '',
+            category: categories[0] || '',
+            newCategory: '',
+            date: getToday(),
+            comment: '',
+            toWalletId: wallets[1]?.id || wallets[0]?.id || '',
+            exchangeRate: ''
+          };
+        }, 0);
+      }
+    } else {
+      initialValueRef.current = null;
+    }
+  }, [isOpen, initialTab, wallets, categories]);
+  
+  const currentValue = {
+    activeTab,
+    amount,
+    walletId,
+    category: showNewCategory ? newCategory : category,
+    newCategory,
+    date,
+    comment,
+    toWalletId,
+    exchangeRate
+  };
+  
+  const hasChanges = initialValueRef.current 
+    ? JSON.stringify(initialValueRef.current) !== JSON.stringify(currentValue)
+    : false;
+  
+  // Уведомление родителя об изменениях
+  useEffect(() => {
+    if (onChangesChange) {
+      onChangesChange(hasChanges);
+    }
+  }, [hasChanges, onChangesChange]);
   
   // Состояния для кастомных dropdown
   const [showWalletDropdown, setShowWalletDropdown] = useState(false);
@@ -90,10 +169,12 @@ export function TransactionForm({ wallets, categories, onSave, onCancel, onAddCa
     }
   }, [walletId, toWalletId, wallets]);
   
-  // Сброс activeTab при смене initialTab
+  // Сброс activeTab при смене initialTab (только если модалка открыта)
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, isOpen]);
   
   // Меняем кошельки местами
   const swapWallets = () => {
@@ -119,8 +200,7 @@ export function TransactionForm({ wallets, categories, onSave, onCancel, onAddCa
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || !walletId) return;
     
@@ -162,6 +242,20 @@ export function TransactionForm({ wallets, categories, onSave, onCancel, onAddCa
       createdAt: new Date().toISOString()
     });
     }
+    
+    // Сбрасываем начальное значение после сохранения
+    initialValueRef.current = null;
+  };
+  
+  // Экспорт hasChanges и save через ref
+  useImperativeHandle(ref, () => ({
+    hasChanges,
+    save: handleSave
+  }), [hasChanges]);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSave();
   };
   
   const getCurrencySymbol = (wId: string) => {
@@ -491,17 +585,10 @@ export function TransactionForm({ wallets, categories, onSave, onCancel, onAddCa
       </div>
       
       <div className="form-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+        <button type="button" className="btn text-danger" onClick={onCancel}>
           Отмена
-        </button>
-        <button 
-          type="submit" 
-          className="btn btn-primary filled"
-          disabled={!amount || !walletId || (activeTab === 'transfer' && (!toWalletId || toWalletId === walletId || (!isSameCurrency && !exchangeRate)))}
-        >
-          Сохранить
         </button>
       </div>
     </form>
   );
-}
+});

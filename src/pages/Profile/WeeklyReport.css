@@ -598,3 +598,128 @@
   animation: pulse 0.4s ease;
 }
 
+/* ===== КАРТОЧКА РУТИНЫ ===== */
+.routine-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--card-bg, #ffffff);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease, box-shadow 0.2s ease;
+}
+
+.routine-card.loaded {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.routine-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.routine-card:active {
+  transform: scale(0.98);
+}
+
+.routine-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.routine-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(156, 39, 176, 0.15) 0%, rgba(156, 39, 176, 0.05) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9C27B0;
+}
+
+.routine-card-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.routine-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.routine-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.routine-card-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.routine-card-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.routine-card-percent {
+  font-size: 28px;
+  font-weight: 700;
+  color: #9C27B0;
+  line-height: 1;
+}
+
+.routine-card-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.routine-card-right {
+  flex-shrink: 0;
+}
+
+/* Бар-график рутин */
+.routine-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 32px;
+}
+
+.routine-bar {
+  width: 8px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--border);
+  transition: all 0.3s ease;
+}
+
+.routine-bar.completed {
+  background: #9C27B0;
+}
+
+.routine-bar.missed {
+  background: #ef4444;
+  opacity: 0.6;
+}
+
+.routine-bar.inactive {
+  opacity: 1;
+  height: 30%;
+}
+

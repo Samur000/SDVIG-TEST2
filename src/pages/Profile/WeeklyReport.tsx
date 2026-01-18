@@ -1,12 +1,27 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
-import { formatDate, getToday } from '../../utils/date';
+import { formatDate, getToday, getDayOfWeek } from '../../utils/date';
 import { Modal } from '../../components/Modal';
-import { TaskForm } from '../Tasks/TaskForm';
+import { TaskForm, TaskFormHandle } from '../Tasks/TaskForm';
 import { CreateHabitModal } from '../Tasks/habits/CreateHabitModal';
 import { Task, Habit, Currency, CURRENCY_SYMBOLS } from '../../types';
 import './WeeklyReport.css';
+
+// Компонент бар-график для рутин (7 дней)
+const RoutineBarChart: React.FC<{ data: { completed: boolean; scheduled: boolean }[]; color: string }> = ({ data, color }) => {
+  return (
+    <div className="routine-bar-chart">
+      {data.map((day, i) => (
+        <div 
+          key={i} 
+          className={`routine-bar ${day.scheduled ? (day.completed ? 'completed' : 'missed') : 'inactive'}`}
+          style={day.completed ? { backgroundColor: color } : undefined}
+        />
+      ))}
+    </div>
+  );
+};
 
 // Компонент Sparkline (мини-график из 7 точек)
 const Sparkline: React.FC<{ data: number[]; color: string; animate?: boolean }> = ({ data, color, animate = true }) => {
@@ -131,6 +146,8 @@ export function WeeklyReport() {
   const [loaded, setLoaded] = useState(false);
   
   const financeCardRef = useRef<HTMLDivElement>(null);
+  const taskFormRef = useRef<TaskFormHandle>(null);
+  const [taskFormHasChanges, setTaskFormHasChanges] = useState(false);
   
   // Fallbacks
   const wallets = state.wallets ?? [];
@@ -332,6 +349,60 @@ export function WeeklyReport() {
       weekData 
     };
   }, [focusSessions]);
+  
+  // Статистика рутин за последние 7 дней
+  const routineData = useMemo(() => {
+    const routines = state.routines || [];
+    const todayDate = new Date();
+    
+    // Данные по дням за неделю
+    const weekData: { completed: boolean; scheduled: boolean }[] = [];
+    let totalScheduled = 0;
+    let totalCompleted = 0;
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(todayDate);
+      date.setDate(date.getDate() - i);
+      const dateStr = formatDate(date);
+      const dayOfWeek = getDayOfWeek(date);
+      
+      // Считаем сколько рутин запланировано на этот день
+      const scheduledRoutines = routines.filter(r => {
+        if (!r.days.includes(dayOfWeek)) return false;
+        // Проверяем createdAt
+        if (r.createdAt) {
+          const createdAt = new Date(r.createdAt + 'T00:00:00');
+          if (date < createdAt) return false;
+        }
+        return true;
+      });
+      
+      // Считаем сколько выполнено
+      const completedRoutines = scheduledRoutines.filter(r => r.completed[dateStr]);
+      
+      const scheduled = scheduledRoutines.length;
+      const completed = completedRoutines.length;
+      
+      totalScheduled += scheduled;
+      totalCompleted += completed;
+      
+      // Для графика: день считается выполненным если все рутины сделаны
+      weekData.push({
+        scheduled: scheduled > 0,
+        completed: scheduled > 0 && completed === scheduled
+      });
+    }
+    
+    const percent = totalScheduled > 0 
+      ? Math.round((totalCompleted / totalScheduled) * 100) 
+      : 0;
+    
+    return {
+      totalRoutines: routines.length,
+      percent,
+      weekData
+    };
+  }, [state.routines]);
   
   // Инсайт
   const insight = useMemo(() => {
@@ -563,6 +634,37 @@ export function WeeklyReport() {
         </div>
       </div>
       
+      {/* Карточка рутины */}
+      {state.routines.length > 0 && (
+        <div 
+          className={`routine-card ${loaded ? 'loaded' : ''}`}
+          onClick={() => navigate('/routine-analytics')}
+        >
+          <div className="routine-card-left">
+            <div className="routine-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                <circle cx="12" cy="12" r="4"/>
+              </svg>
+            </div>
+            <div className="routine-card-info">
+              <span className="routine-card-title">Рутина</span>
+              <span className="routine-card-subtitle">Выполнение за 7 дней</span>
+            </div>
+          </div>
+          <div className="routine-card-center">
+            <span className="routine-card-percent">{routineData.percent}%</span>
+            <span className="routine-card-label">средний показатель</span>
+          </div>
+          <div className="routine-card-right">
+            <RoutineBarChart 
+              data={routineData.weekData} 
+              color="#9C27B0"
+            />
+          </div>
+        </div>
+      )}
+      
       {/* Ринг-карточки */}
       <div className="ring-cards-scroll">
         <div className="ring-cards">
@@ -665,13 +767,39 @@ export function WeeklyReport() {
       {/* Модалки */}
       <Modal
         isOpen={showTaskForm}
-        onClose={() => setShowTaskForm(false)}
+        onClose={() => {
+          setShowTaskForm(false);
+          setTaskFormHasChanges(false);
+        }}
+        onRequestClose={() => {
+          if (taskFormRef.current?.hasChanges) {
+            setTaskFormHasChanges(true);
+            return;
+          }
+          setShowTaskForm(false);
+        }}
+        hasChanges={taskFormHasChanges}
+        onSave={() => {
+          if (taskFormRef.current) {
+            taskFormRef.current.save();
+          }
+        }}
+        confirmMessage="задачи"
         title="Новая задача"
       >
         <TaskForm
+          ref={taskFormRef}
           task={null}
-          onSave={handleSaveTask}
-          onCancel={() => setShowTaskForm(false)}
+          onChangesChange={setTaskFormHasChanges}
+          onSave={(task) => {
+            handleSaveTask(task);
+            setShowTaskForm(false);
+            setTaskFormHasChanges(false);
+          }}
+          onCancel={() => {
+            setShowTaskForm(false);
+            setTaskFormHasChanges(false);
+          }}
         />
       </Modal>
       

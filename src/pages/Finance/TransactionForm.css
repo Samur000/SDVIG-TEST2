@@ -264,11 +264,23 @@
   display: flex;
   gap: 12px;
   margin-top: 8px;
+  justify-content: flex-end;
 }
 
 .transaction-form .form-actions .btn {
-  flex: 1;
+  flex: 0 1 auto;
   justify-content: center;
+}
+
+.transaction-form .form-actions .btn.text-danger {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.transaction-form .form-actions .btn.text-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border-color: #dc2626;
 }
 
 /* Custom Wallet Select Dropdown */

@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Wallet, WalletIcon, WalletColor, Currency, WALLET_COLORS, WALLET_ICONS, CURRENCIES, CURRENCY_NAMES, CURRENCY_SYMBOLS } from '../../types';
 import { v4 as uuid } from 'uuid';
+import { useFormChanges } from '../../hooks/useFormChanges';
 import './WalletForm.css';
 
 // Импорт PNG иконок
@@ -19,6 +20,12 @@ interface WalletFormProps {
   wallet?: Wallet | null;
   onSave: (wallet: Wallet) => void;
   onCancel: () => void;
+  onChangesChange?: (hasChanges: boolean) => void;
+}
+
+export interface WalletFormHandle {
+  hasChanges: boolean;
+  save: () => void;
 }
 
 // Иконки для кошельков - PNG для карты и наличных, SVG для остальных
@@ -204,13 +211,49 @@ const WalletIconComponent: React.FC<{ icon: WalletIcon; color?: string; size?: n
 // Для обратной совместимости - алиас
 const WalletIconSVG = WalletIconComponent;
 
-export function WalletForm({ wallet, onSave, onCancel }: WalletFormProps) {
+export const WalletForm = forwardRef<WalletFormHandle, WalletFormProps>(({ wallet, onSave, onCancel, onChangesChange }, ref) => {
   const [name, setName] = useState(wallet?.name || '');
   const [icon, setIcon] = useState<WalletIcon>(wallet?.icon || 'card');
   const [color, setColor] = useState<WalletColor>(wallet?.color || '#3B82F6');
   const [currency, setCurrency] = useState<Currency>(wallet?.currency || 'RUB');
   const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
   const currencyDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Отслеживание изменений
+  const initialValue = useMemo(() => {
+    if (wallet) {
+      return {
+        name: wallet.name,
+        icon: wallet.icon,
+        color: wallet.color,
+        currency: wallet.currency
+      };
+    } else {
+      return {
+        name: '',
+        icon: 'card' as WalletIcon,
+        color: '#3B82F6' as WalletColor,
+        currency: 'RUB' as Currency
+      };
+    }
+  }, [wallet]);
+  
+  const { hasChanges } = useFormChanges(
+    initialValue,
+    () => ({
+      name,
+      icon,
+      color,
+      currency
+    })
+  );
+  
+  // Уведомление родителя об изменениях
+  useEffect(() => {
+    if (onChangesChange) {
+      onChangesChange(hasChanges);
+    }
+  }, [hasChanges, onChangesChange]);
   
   // Закрытие dropdown при клике вне его
   useEffect(() => {
@@ -229,8 +272,7 @@ export function WalletForm({ wallet, onSave, onCancel }: WalletFormProps) {
     };
   }, [showCurrencyDropdown]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     if (!name.trim()) return;
     
     onSave({
@@ -241,6 +283,17 @@ export function WalletForm({ wallet, onSave, onCancel }: WalletFormProps) {
       currency,
       balance: wallet?.balance || 0
     });
+  };
+  
+  // Экспорт hasChanges и save через ref
+  useImperativeHandle(ref, () => ({
+    hasChanges,
+    save: handleSave
+  }), [hasChanges, name, icon, color, currency]);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSave();
   };
   
   return (
@@ -356,20 +409,13 @@ export function WalletForm({ wallet, onSave, onCancel }: WalletFormProps) {
       </div>
       
       <div className="form-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+        <button type="button" className="btn text-danger" onClick={onCancel}>
           Отмена
-        </button>
-        <button 
-          type="submit" 
-          className="btn btn-primary filled"
-          disabled={!name.trim()}
-        >
-          {wallet ? 'Сохранить' : 'Создать'}
         </button>
       </div>
     </form>
   );
-}
+});
 
 export { WalletIconSVG };
 

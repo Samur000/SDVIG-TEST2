@@ -16,8 +16,8 @@ import {
 	addDays
 } from '../../utils/date';
 import { v4 as uuid } from 'uuid';
-import { RoutineForm } from './RoutineForm';
-import { EventForm } from './EventForm';
+import { RoutineForm, RoutineFormHandle } from './RoutineForm';
+import { EventForm, EventFormHandle } from './EventForm';
 import { EventDetailsModal } from './EventDetailsModal';
 import { formatTime } from './CalendarUtils';
 import './DayPage.css';
@@ -39,6 +39,19 @@ export function DayPage() {
 	const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
 	const [editingEvent, setEditingEvent] = useState<Event | null>(null);
 	const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+	const eventFormRef = useRef<EventFormHandle>(null);
+	const [eventFormHasChanges, setEventFormHasChanges] = useState(false);
+	const routineFormRef = useRef<RoutineFormHandle>(null);
+	const [routineFormHasChanges, setRoutineFormHasChanges] = useState(false);
+	const [dayTaskFormHasChanges, setDayTaskFormHasChanges] = useState(false);
+	
+	// Отслеживание изменений в форме DayTask
+	const initialDayTaskTitle = useMemo(() => editingDayTask?.title || '', [editingDayTask]);
+	const dayTaskHasChanges = dayTaskTitle.trim() !== initialDayTaskTitle;
+	
+	useEffect(() => {
+		setDayTaskFormHasChanges(dayTaskHasChanges);
+	}, [dayTaskHasChanges]);
 
 	// Свайп-навигация
 	const touchStartX = useRef<number | null>(null);
@@ -617,32 +630,107 @@ export function DayPage() {
 			{/* Модалки */}
 			<Modal
 				isOpen={showRoutineForm}
-				onClose={() => { setShowRoutineForm(false); setEditingRoutine(null); }}
+				onClose={() => { 
+					setShowRoutineForm(false); 
+					setEditingRoutine(null);
+					setRoutineFormHasChanges(false);
+				}}
+				onRequestClose={() => {
+					if (routineFormRef.current?.hasChanges) {
+						setRoutineFormHasChanges(true);
+						return;
+					}
+					setShowRoutineForm(false);
+					setEditingRoutine(null);
+				}}
+				hasChanges={routineFormHasChanges}
+				onSave={() => {
+					if (routineFormRef.current) {
+						routineFormRef.current.save();
+					}
+				}}
+				confirmMessage="рутины"
 				title={editingRoutine ? 'Редактировать рутину' : 'Новая рутина'}
 			>
 				<RoutineForm
+					ref={routineFormRef}
 					routine={editingRoutine}
-					onSave={handleSaveRoutine}
-					onCancel={() => { setShowRoutineForm(false); setEditingRoutine(null); }}
+					onChangesChange={setRoutineFormHasChanges}
+					onSave={(routine) => {
+						handleSaveRoutine(routine);
+						setShowRoutineForm(false);
+						setEditingRoutine(null);
+						setRoutineFormHasChanges(false);
+					}}
+					onCancel={() => { setShowRoutineForm(false); setEditingRoutine(null); setRoutineFormHasChanges(false); }}
 				/>
 			</Modal>
 
 			<Modal
 				isOpen={showEventForm}
-				onClose={() => { setShowEventForm(false); setEditingEvent(null); }}
+				onClose={() => { 
+					setShowEventForm(false); 
+					setEditingEvent(null);
+					setEventFormHasChanges(false);
+				}}
+				onRequestClose={() => {
+					if (eventFormRef.current?.hasChanges) {
+						setEventFormHasChanges(true);
+						return;
+					}
+					setShowEventForm(false);
+					setEditingEvent(null);
+				}}
+				hasChanges={eventFormHasChanges}
+				onSave={() => {
+					if (eventFormRef.current) {
+						eventFormRef.current.save();
+					}
+				}}
+				confirmMessage="события"
 				title={editingEvent ? 'Редактировать событие' : 'Новое событие'}
 			>
 				<EventForm
+					ref={eventFormRef}
 					event={editingEvent}
 					defaultDate={dateStr}
-					onSave={handleSaveEvent}
-					onCancel={() => { setShowEventForm(false); setEditingEvent(null); }}
+					onChangesChange={setEventFormHasChanges}
+					onSave={(event) => {
+						handleSaveEvent(event);
+						setShowEventForm(false);
+						setEditingEvent(null);
+						setEventFormHasChanges(false);
+					}}
+					onCancel={() => { setShowEventForm(false); setEditingEvent(null); setEventFormHasChanges(false); }}
 				/>
 			</Modal>
 
 			<Modal
 				isOpen={showDayTaskForm}
-				onClose={() => { setShowDayTaskForm(false); setDayTaskTitle(''); setEditingDayTask(null); }}
+				onClose={() => { 
+					setShowDayTaskForm(false); 
+					setDayTaskTitle(editingDayTask?.title || ''); 
+					setEditingDayTask(null);
+					setDayTaskFormHasChanges(false);
+				}}
+				onRequestClose={() => {
+					if (dayTaskFormHasChanges) {
+						setDayTaskFormHasChanges(true);
+						return;
+					}
+					setShowDayTaskForm(false);
+					setDayTaskTitle(editingDayTask?.title || '');
+					setEditingDayTask(null);
+				}}
+				hasChanges={dayTaskFormHasChanges}
+				onSave={() => {
+					handleSaveDayTask();
+					setShowDayTaskForm(false);
+					setDayTaskTitle('');
+					setEditingDayTask(null);
+					setDayTaskFormHasChanges(false);
+				}}
+				confirmMessage="главной задачи дня"
 				title={editingDayTask ? "Редактировать задачу" : "Главная задача дня"}
 			>
 				<form onSubmit={(e) => { e.preventDefault(); handleSaveDayTask(); }} className="form">
@@ -657,11 +745,13 @@ export function DayPage() {
 						/>
 					</div>
 					<div className="form-actions">
-						<button type="button" className="btn" onClick={() => { setShowDayTaskForm(false); setDayTaskTitle(''); setEditingDayTask(null); }}>
+						<button type="button" className="btn text-danger" onClick={() => { 
+							setShowDayTaskForm(false); 
+							setDayTaskTitle(editingDayTask?.title || ''); 
+							setEditingDayTask(null);
+							setDayTaskFormHasChanges(false);
+						}}>
 							Отмена
-						</button>
-						<button type="submit" className="btn btn-primary filled" disabled={!dayTaskTitle.trim()}>
-							{editingDayTask ? 'Сохранить' : 'Добавить'}
 						</button>
 					</div>
 				</form>

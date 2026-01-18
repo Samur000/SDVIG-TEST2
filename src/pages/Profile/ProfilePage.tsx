@@ -1,11 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
 import { EmptyState } from '../../components/UI';
 import { useApp } from '../../store/AppContext';
 import { Document } from '../../types';
-import { DocumentForm } from './DocumentForm';
+import { DocumentForm, DocumentFormHandle } from './DocumentForm';
 import { WeeklyReport } from './WeeklyReport';
 import './ProfilePage.css';
 
@@ -14,6 +14,8 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const [showDocForm, setShowDocForm] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const documentFormRef = useRef<DocumentFormHandle>(null);
+  const [documentFormHasChanges, setDocumentFormHasChanges] = useState(false);
   
   // Фолбэки для старых/повреждённых данных из хранилища
   const documents = state.documents ?? [];
@@ -189,12 +191,38 @@ export function ProfilePage() {
       {/* Модалки */}
       <Modal
         isOpen={showDocForm}
-        onClose={() => setShowDocForm(false)}
+        onClose={() => {
+          setShowDocForm(false);
+          setDocumentFormHasChanges(false);
+        }}
+        onRequestClose={() => {
+          if (documentFormRef.current?.hasChanges) {
+            setDocumentFormHasChanges(true);
+            return;
+          }
+          setShowDocForm(false);
+        }}
+        hasChanges={documentFormHasChanges}
+        onSave={() => {
+          if (documentFormRef.current) {
+            documentFormRef.current.save();
+          }
+        }}
+        confirmMessage="документа"
         title="Добавить документ"
       >
         <DocumentForm
-          onSave={handleAddDocument}
-          onCancel={() => setShowDocForm(false)}
+          ref={documentFormRef}
+          onChangesChange={setDocumentFormHasChanges}
+          onSave={(doc) => {
+            handleAddDocument(doc);
+            setShowDocForm(false);
+            setDocumentFormHasChanges(false);
+          }}
+          onCancel={() => {
+            setShowDocForm(false);
+            setDocumentFormHasChanges(false);
+          }}
         />
       </Modal>
       

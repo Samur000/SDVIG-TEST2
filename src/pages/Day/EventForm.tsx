@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Event, EVENT_COLORS, EVENT_COLOR_DEFAULT } from '../../types';
 import { v4 as uuid } from 'uuid';
 import { formatDate } from '../../utils/date';
 import { vibrate } from '../../utils/feedback';
+import { useFormChanges } from '../../hooks/useFormChanges';
 import './Forms.css';
 
 interface EventFormProps {
@@ -10,9 +11,16 @@ interface EventFormProps {
   defaultDate: string; // YYYY-MM-DD
   onSave: (event: Event) => void;
   onCancel: () => void;
+  onChangesChange?: (hasChanges: boolean) => void;
 }
 
-export function EventForm({ event, defaultDate, onSave, onCancel }: EventFormProps) {
+export interface EventFormHandle {
+  hasChanges: boolean;
+  save: () => void;
+}
+
+export const EventForm = forwardRef<EventFormHandle, EventFormProps>(({ event, defaultDate, onSave, onCancel, onChangesChange }, ref) => {
+
   // Для новых событий: начало - текущее время округленное до ближайших 30 минут, конец - +1 час
   const getDefaultStartTime = () => {
     const now = new Date();
@@ -75,6 +83,62 @@ export function EventForm({ event, defaultDate, onSave, onCancel }: EventFormPro
   const [endTime, setEndTime] = useState(initialData.endTime);
   const [color, setColor] = useState(event?.color || EVENT_COLOR_DEFAULT);
   const [timeError, setTimeError] = useState('');
+  
+  // Отслеживание изменений
+  const initialValue = useMemo(() => {
+    if (event) {
+      return {
+        title: event.title,
+        description: event.description || '',
+        date: formatDate(typeof event.startTime === 'string' ? new Date(event.startTime) : event.startTime),
+        startTime: typeof event.startTime === 'string' ? new Date(event.startTime) : event.startTime,
+        endTime: typeof event.endTime === 'string' ? new Date(event.endTime) : event.endTime,
+        color: event.color || EVENT_COLOR_DEFAULT
+      };
+    } else {
+      return {
+        title: '',
+        description: '',
+        date: defaultDate,
+        startTime: initialData.startTime,
+        endTime: initialData.endTime,
+        color: EVENT_COLOR_DEFAULT
+      };
+    }
+  }, [event, defaultDate, initialData]);
+  
+  const { hasChanges } = useFormChanges(
+    initialValue,
+    () => ({
+      title,
+      description,
+      date,
+      startTime,
+      endTime,
+      color
+    }),
+    (a, b) => {
+      return a.title === b.title &&
+        a.description === b.description &&
+        a.date === b.date &&
+        a.startTime.getTime() === b.startTime.getTime() &&
+        a.endTime.getTime() === b.endTime.getTime() &&
+        a.color === b.color;
+    }
+  );
+  
+  // Уведомление родителя об изменениях
+  useEffect(() => {
+    if (onChangesChange) {
+      onChangesChange(hasChanges);
+    }
+  }, [hasChanges, onChangesChange]);
+  
+  // Экспорт hasChanges и save через ref
+  useImperativeHandle(ref, () => ({
+    hasChanges,
+    save: handleSave
+  }), [hasChanges, title, description, date, startTime, endTime, color]);
 
   // Обновление времени при изменении даты
   useEffect(() => {
@@ -147,8 +211,7 @@ export function EventForm({ event, defaultDate, onSave, onCancel }: EventFormPro
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     if (!title.trim() || !date) return;
     if (startTime >= endTime) return;
     
@@ -166,6 +229,11 @@ export function EventForm({ event, defaultDate, onSave, onCancel }: EventFormPro
       color,
       completed: event?.completed || false
     });
+  };
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSave();
   };
   
   return (
@@ -254,17 +322,10 @@ export function EventForm({ event, defaultDate, onSave, onCancel }: EventFormPro
       </div>
       
       <div className="form-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+        <button type="button" className="btn text-danger" onClick={onCancel}>
           Отмена
-        </button>
-        <button 
-          type="submit" 
-          className="btn btn-primary filled"
-          disabled={!title.trim() || !date || startTime >= endTime || ((endTime.getTime() - startTime.getTime()) / (1000 * 60)) < 30}
-        >
-          Сохранить
         </button>
       </div>
     </form>
   );
-}
+});

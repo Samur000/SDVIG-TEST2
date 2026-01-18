@@ -15,7 +15,7 @@ import {
 import { DayView } from './DayView';
 import { WeekView } from './WeekView';
 import { MonthView } from './MonthView';
-import { EventForm } from './EventForm';
+import { EventForm, EventFormHandle } from './EventForm';
 import { EventDetailsModal } from './EventDetailsModal';
 import { Modal } from '../../components/Modal';
 import './CalendarPage.css';
@@ -35,6 +35,8 @@ export function CalendarPage() {
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const eventFormRef = useRef<EventFormHandle>(null);
+  const [eventFormHasChanges, setEventFormHasChanges] = useState(false);
   
   // Свайп-навигация
   const touchStartX = useRef<number | null>(null);
@@ -479,16 +481,40 @@ export function CalendarPage() {
         onClose={() => {
           setShowEventForm(false);
           setEditingEvent(null);
+          setEventFormHasChanges(false);
         }}
+        onRequestClose={() => {
+          if (eventFormRef.current?.hasChanges) {
+            setEventFormHasChanges(true);
+            return;
+          }
+          setShowEventForm(false);
+          setEditingEvent(null);
+        }}
+        hasChanges={eventFormHasChanges}
+        onSave={() => {
+          if (eventFormRef.current) {
+            eventFormRef.current.save();
+          }
+        }}
+        confirmMessage="события"
         title={editingEvent ? 'Редактировать событие' : 'Новое событие'}
       >
         <EventForm
+          ref={eventFormRef}
           event={editingEvent}
           defaultDate={defaultDate}
-          onSave={handleSaveEvent}
+          onChangesChange={setEventFormHasChanges}
+          onSave={(event) => {
+            handleSaveEvent(event);
+            setShowEventForm(false);
+            setEditingEvent(null);
+            setEventFormHasChanges(false);
+          }}
           onCancel={() => {
             setShowEventForm(false);
             setEditingEvent(null);
+            setEventFormHasChanges(false);
           }}
         />
       </Modal>

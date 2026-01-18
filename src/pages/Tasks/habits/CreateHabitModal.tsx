@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../../../components/Modal';
 import { Habit, HabitIcon, HabitColor } from '../../../types';
 import { HabitIconComponent, HABIT_ICONS, HABIT_COLORS } from './HabitIcons';
+import { useFormChanges } from '../../../hooks/useFormChanges';
 import { v4 as uuid } from 'uuid';
 import './Habits.css';
 
@@ -34,8 +35,37 @@ export function CreateHabitModal({ isOpen, onClose, onSave, editingHabit }: Crea
       }
     }
   }, [isOpen, editingHabit]);
+  
+  // Отслеживание изменений
+  const initialValue = useMemo(() => {
+    if (editingHabit) {
+      return {
+        title: editingHabit.title,
+        description: editingHabit.description || '',
+        icon: editingHabit.icon,
+        color: editingHabit.color
+      };
+    } else {
+      return {
+        title: '',
+        description: '',
+        icon: 'book' as HabitIcon,
+        color: '#13b4ff' as HabitColor
+      };
+    }
+  }, [editingHabit, isOpen]);
+  
+  const { hasChanges } = useFormChanges(
+    initialValue,
+    () => ({
+      title,
+      description,
+      icon,
+      color
+    })
+  );
 
-  const handleSubmit = () => {
+  const handleSave = () => {
     if (!title.trim()) return;
 
     const habit: Habit = {
@@ -62,6 +92,16 @@ export function CreateHabitModal({ isOpen, onClose, onSave, editingHabit }: Crea
     <Modal 
       isOpen={isOpen} 
       onClose={handleClose}
+      onRequestClose={() => {
+        if (hasChanges) {
+          // Модалка подтверждения покажется автоматически из Modal
+          return;
+        }
+        onClose();
+      }}
+      hasChanges={hasChanges}
+      onSave={handleSave}
+      confirmMessage="привычки"
       title={editingHabit ? 'Редактировать привычку' : 'Новая привычка'}
     >
       <div className="create-habit-form">
@@ -145,16 +185,8 @@ export function CreateHabitModal({ isOpen, onClose, onSave, editingHabit }: Crea
 
         {/* Actions */}
         <div className="habit-form-actions">
-          <button type="button" className="btn" onClick={handleClose}>
+          <button type="button" className="btn text-danger" onClick={handleClose}>
             Отмена
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-primary filled"
-            onClick={handleSubmit}
-            disabled={!title.trim()}
-          >
-            {editingHabit ? 'Сохранить' : 'Создать'}
           </button>
         </div>
       </div>

@@ -1,12 +1,12 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
 import { EmptyState } from '../../components/UI';
 import { useApp } from '../../store/AppContext';
 import { Transaction, Wallet, CURRENCY_SYMBOLS } from '../../types';
 import { formatDateShort, groupByDate, isThisWeek, isThisMonth } from '../../utils/date';
-import { TransactionForm } from './TransactionForm';
-import { WalletForm, WalletIconSVG } from './WalletForm';
+import { TransactionForm, TransactionFormHandle } from './TransactionForm';
+import { WalletForm, WalletIconSVG, WalletFormHandle } from './WalletForm';
 import './FinancePage.css';
 
 const TRANSACTIONS_VISIBILITY_KEY = 'sdvig_finance_transactions_visible';
@@ -17,6 +17,10 @@ export function FinancePage() {
   const [showWalletForm, setShowWalletForm] = useState(false);
   const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
   const [initialTab, setInitialTab] = useState<'expense' | 'income' | 'transfer'>('expense');
+  const walletFormRef = useRef<WalletFormHandle>(null);
+  const [walletFormHasChanges, setWalletFormHasChanges] = useState(false);
+  const transactionFormRef = useRef<TransactionFormHandle>(null);
+  const [transactionFormHasChanges, setTransactionFormHasChanges] = useState(false);
   
   const [showTransactions, setShowTransactions] = useState(() => {
     const saved = localStorage.getItem(TRANSACTIONS_VISIBILITY_KEY);
@@ -378,15 +382,41 @@ export function FinancePage() {
       {/* Модалка транзакции */}
       <Modal 
         isOpen={showForm} 
-        onClose={() => setShowForm(false)}
+        onClose={() => {
+          setShowForm(false);
+          setTransactionFormHasChanges(false);
+        }}
+        onRequestClose={() => {
+          if (transactionFormRef.current?.hasChanges) {
+            setTransactionFormHasChanges(true);
+            return;
+          }
+          setShowForm(false);
+        }}
+        hasChanges={transactionFormHasChanges}
+        onSave={() => {
+          if (transactionFormRef.current) {
+            transactionFormRef.current.save();
+          }
+        }}
+        confirmMessage="операции"
         title="Новая операция"
         size="lg"
       >
         <TransactionForm
+          ref={transactionFormRef}
           wallets={state.wallets}
           categories={state.categories}
-          onSave={handleSaveTransaction}
-          onCancel={() => setShowForm(false)}
+          onChangesChange={setTransactionFormHasChanges}
+          onSave={(tx) => {
+            handleSaveTransaction(tx);
+            setShowForm(false);
+            setTransactionFormHasChanges(false);
+          }}
+          onCancel={() => {
+            setShowForm(false);
+            setTransactionFormHasChanges(false);
+          }}
           onAddCategory={(cat) => dispatch({ type: 'ADD_CATEGORY', payload: cat })}
           isOpen={showForm}
           initialTab={initialTab}
@@ -396,14 +426,44 @@ export function FinancePage() {
       {/* Модалка кошелька */}
       <Modal 
         isOpen={showWalletForm} 
-        onClose={() => { setShowWalletForm(false); setEditingWallet(null); }}
+        onClose={() => { 
+          setShowWalletForm(false); 
+          setEditingWallet(null);
+          setWalletFormHasChanges(false);
+        }}
+        onRequestClose={() => {
+          if (walletFormRef.current?.hasChanges) {
+            setWalletFormHasChanges(true);
+            return;
+          }
+          setShowWalletForm(false);
+          setEditingWallet(null);
+        }}
+        hasChanges={walletFormHasChanges}
+        onSave={() => {
+          if (walletFormRef.current) {
+            walletFormRef.current.save();
+          }
+        }}
+        confirmMessage="кошелька"
         title={editingWallet ? 'Редактировать кошелёк' : 'Новый кошелёк'}
         size="lg"
       >
         <WalletForm
+          ref={walletFormRef}
           wallet={editingWallet}
-          onSave={handleSaveWallet}
-          onCancel={() => { setShowWalletForm(false); setEditingWallet(null); }}
+          onChangesChange={setWalletFormHasChanges}
+          onSave={(wallet) => {
+            handleSaveWallet(wallet);
+            setShowWalletForm(false);
+            setEditingWallet(null);
+            setWalletFormHasChanges(false);
+          }}
+          onCancel={() => { 
+            setShowWalletForm(false); 
+            setEditingWallet(null);
+            setWalletFormHasChanges(false);
+          }}
         />
         {editingWallet && (
           <div className="wallet-form-delete">

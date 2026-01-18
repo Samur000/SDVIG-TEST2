@@ -1,0 +1,427 @@
+.routine-analytics {
+  padding: 16px;
+  padding-bottom: calc(var(--nav-height) + var(--safe-area-bottom) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Фильтр периода */
+.period-filter {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.period-chip {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.period-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #9C27B0;
+}
+
+/* Общая статистика */
+.overview-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 20px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.overview-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.overview-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.overview-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.overview-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+}
+
+/* Секция рутин */
+.routines-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.routines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.routine-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.routine-item:active {
+  transform: scale(0.98);
+  background: var(--hover);
+}
+
+.routine-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.routine-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.routine-missed {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.routine-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 80px;
+}
+
+.routine-percent {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.routine-percent.good {
+  color: #22c55e;
+}
+
+.routine-percent.warning {
+  color: #f59e0b;
+}
+
+.routine-percent.danger {
+  color: #ef4444;
+}
+
+/* Прогресс-бар */
+.routine-progress-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.routine-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.routine-progress-fill.good {
+  background: #22c55e;
+}
+
+.routine-progress-fill.warning {
+  background: #f59e0b;
+}
+
+.routine-progress-fill.danger {
+  background: #ef4444;
+}
+
+/* Пустое состояние */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Инсайт */
+.insight-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.insight-card.insight-good {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.insight-card.insight-warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.insight-card.insight-danger {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.insight-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.insight-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* Детали рутины (модалка) */
+.routine-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.details-section h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Мини-календарь */
+.mini-calendar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.calendar-square {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.calendar-square.completed {
+  background: #22c55e;
+}
+
+.calendar-square.missed {
+  background: #ef4444;
+}
+
+.calendar-square.inactive {
+  background: var(--border);
+  opacity: 0.3;
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legend-item .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.legend-item .dot.completed {
+  background: #22c55e;
+}
+
+.legend-item .dot.missed {
+  background: #ef4444;
+}
+
+/* Статистика в модалке */
+.details-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: 16px;
+  background: var(--hover);
+  border-radius: var(--radius-lg);
+}
+
+.detail-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.detail-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.detail-value.good {
+  color: #22c55e;
+}
+
+.detail-value.danger {
+  color: #ef4444;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* График по дням недели */
+.weekday-chart {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 80px;
+  padding: 8px 0;
+}
+
+.weekday-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  height: 100%;
+}
+
+.weekday-bar {
+  width: 20px;
+  min-height: 4px;
+  background: var(--border);
+  border-radius: 4px 4px 0 0;
+  margin-top: auto;
+  transition: height 0.3s ease;
+}
+
+.weekday-bar.worst {
+  background: #ef4444;
+}
+
+.weekday-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.weekday-count {
+  font-size: 10px;
+  color: var(--muted);
+  position: absolute;
+  display: none;
+}
+
+/* Инсайт по рутине */
+.routine-insight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.routine-insight.good {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.routine-insight.warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.routine-insight.danger {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.routine-insight .insight-icon {
+  font-size: 20px;
+}
+
+.routine-insight .insight-text {
+  font-size: 13px;
+}

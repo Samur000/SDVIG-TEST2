@@ -1,20 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Profile } from '../../types';
+import { useFormChanges } from '../../hooks/useFormChanges';
 import './Forms.css';
 
 interface ProfileFormProps {
   profile: Profile;
   onSave: (profile: Profile) => void;
   onCancel: () => void;
+  onChangesChange?: (hasChanges: boolean) => void;
+}
+
+export interface ProfileFormHandle {
+  hasChanges: boolean;
+  save: () => void;
 }
 
 const GOAL_SUGGESTIONS = ['Здоровье', 'Финансы', 'Развитие', 'Отношения', 'Карьера', 'Хобби'];
 
-export function ProfileForm({ profile, onSave, onCancel }: ProfileFormProps) {
+export const ProfileForm = forwardRef<ProfileFormHandle, ProfileFormProps>(({ profile, onSave, onCancel, onChangesChange }, ref) => {
   const [name, setName] = useState(profile.name || '');
   const [bio, setBio] = useState(profile.bio || '');
   const [goals, setGoals] = useState<string[]>(profile.goals || []);
   const [newGoal, setNewGoal] = useState('');
+  
+  // Отслеживание изменений
+  const initialValue = useMemo(() => {
+    return {
+      name: profile.name || '',
+      bio: profile.bio || '',
+      goals: profile.goals || []
+    };
+  }, [profile]);
+  
+  const { hasChanges } = useFormChanges(
+    initialValue,
+    () => ({
+      name,
+      bio,
+      goals: [...goals].sort()
+    }),
+    (a, b) => {
+      return a.name === b.name &&
+        a.bio === b.bio &&
+        JSON.stringify([...a.goals].sort()) === JSON.stringify([...b.goals].sort());
+    }
+  );
+  
+  // Уведомление родителя об изменениях
+  useEffect(() => {
+    if (onChangesChange) {
+      onChangesChange(hasChanges);
+    }
+  }, [hasChanges, onChangesChange]);
   
   const handleToggleGoal = (goal: string) => {
     if (goals.includes(goal)) {
@@ -31,13 +68,23 @@ export function ProfileForm({ profile, onSave, onCancel }: ProfileFormProps) {
     }
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     onSave({
       name: name.trim(),
       bio: bio.trim() || undefined,
       goals
     });
+  };
+  
+  // Экспорт hasChanges и save через ref
+  useImperativeHandle(ref, () => ({
+    hasChanges,
+    save: handleSave
+  }), [hasChanges, name, bio, goals]);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSave();
   };
   
   return (
@@ -114,14 +161,11 @@ export function ProfileForm({ profile, onSave, onCancel }: ProfileFormProps) {
       </div>
       
       <div className="form-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+        <button type="button" className="btn text-danger" onClick={onCancel}>
           Отмена
-        </button>
-        <button type="submit" className="btn btn-primary filled">
-          Сохранить
         </button>
       </div>
     </form>
   );
-}
+});
 

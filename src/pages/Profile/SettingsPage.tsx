@@ -5,7 +5,7 @@
  * localStorage больше не используется для основных данных
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
@@ -65,6 +65,29 @@ export function SettingsPage() {
   const hasStartPageChanges = 
     tempStartPageMode !== savedStartPageMode || 
     (tempStartPageMode === 'custom' && tempCustomStartPage !== savedCustomStartPage);
+  
+  // Отслеживание изменений в профиле
+  const profileInitialValue = useMemo(() => ({
+    name: state.profile.name || '',
+    bio: state.profile.bio || '',
+    goals: state.profile.goals || [],
+    avatar: state.profile.avatar
+  }), [state.profile]);
+  
+  const hasProfileChanges = useMemo(() => {
+    return name !== profileInitialValue.name ||
+      bio !== profileInitialValue.bio ||
+      JSON.stringify([...goals].sort()) !== JSON.stringify([...profileInitialValue.goals].sort()) ||
+      avatar !== profileInitialValue.avatar;
+  }, [name, bio, goals, avatar, profileInitialValue]);
+  
+  const [profileModalHasChanges, setProfileModalHasChanges] = useState(false);
+  
+  useEffect(() => {
+    if (activeModal === 'profile') {
+      setProfileModalHasChanges(hasProfileChanges);
+    }
+  }, [hasProfileChanges, activeModal]);
   
   // Получить текст текущего выбора стартовой страницы (из сохранённых)
   const getStartPageLabel = (): string => {
@@ -126,6 +149,7 @@ export function SettingsPage() {
     setAvatar(state.profile.avatar);
     setNewGoal('');
     setActiveModal('profile');
+    setProfileModalHasChanges(false);
   };
   
   // Обработка целей
@@ -211,7 +235,9 @@ export function SettingsPage() {
     };
     dispatch({ type: 'UPDATE_PROFILE', payload: updatedProfile });
     setActiveModal(null);
+    setProfileModalHasChanges(false);
   };
+  
   
   /**
    * Экспорт данных из IndexedDB
@@ -306,12 +332,17 @@ export function SettingsPage() {
     setActiveModal('import');
   };
   
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     if (isProcessing) return; // Не закрываем во время обработки
+    if (activeModal === 'profile' && profileModalHasChanges) {
+      // Модалка подтверждения покажется автоматически через onRequestClose
+      return;
+    }
     setActiveModal(null);
     setPendingFile(null);
+    setProfileModalHasChanges(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  }, [isProcessing, activeModal, profileModalHasChanges]);
   
   return (
     <Layout 
@@ -590,6 +621,16 @@ export function SettingsPage() {
       <Modal
         isOpen={activeModal === 'profile'}
         onClose={closeModal}
+        onRequestClose={() => {
+          if (profileModalHasChanges) {
+            setProfileModalHasChanges(true);
+            return;
+          }
+          setActiveModal(null);
+        }}
+        hasChanges={profileModalHasChanges}
+        onSave={handleSaveProfile}
+        confirmMessage="профиля"
         title="Редактировать профиль"
       >
         <div className="profile-edit-modal">
@@ -694,10 +735,7 @@ export function SettingsPage() {
           
           {/* Кнопки */}
           <div className="form-actions">
-            <button className="btn" onClick={closeModal}>Отмена</button>
-            <button className="btn btn-primary filled" onClick={handleSaveProfile}>
-              Сохранить
-            </button>
+            <button className="btn text-danger" onClick={closeModal}>Отмена</button>
           </div>
         </div>
       </Modal>
