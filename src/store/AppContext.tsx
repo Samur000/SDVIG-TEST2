@@ -25,8 +25,7 @@ import {
   StartPageMode,
   AppPage,
   Settings,
-  migrateWallets,
-  DayOfWeek
+  migrateWallets
   } from '../types';
   import { initStorage, saveStateAsync } from './storage';
   import { v4 as uuid } from 'uuid';
