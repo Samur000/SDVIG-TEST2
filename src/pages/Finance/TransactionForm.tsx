@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Transaction, Wallet, CURRENCY_SYMBOLS } from '../../types';
 import { getToday } from '../../utils/date';
 import { v4 as uuid } from 'uuid';
@@ -199,7 +199,7 @@ export const TransactionForm = forwardRef<TransactionFormHandle, TransactionForm
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const numAmount = parseFloat(amount);
     if (!numAmount || !walletId) return;
     
@@ -210,7 +210,10 @@ export const TransactionForm = forwardRef<TransactionFormHandle, TransactionForm
       const calculatedToAmount = isSameCurrency ? numAmount : numAmount * numExchangeRate;
       if (!isSameCurrency && !numExchangeRate) return;
       
-      onSave({
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const transaction: Transaction = {
         id: uuid(),
         type: 'transfer',
         amount: numAmount,
@@ -220,37 +223,44 @@ export const TransactionForm = forwardRef<TransactionFormHandle, TransactionForm
         toAmount: calculatedToAmount,
         category: 'Перевод',
         comment: comment.trim() || undefined,
-        createdAt: new Date().toISOString()
-      });
+        createdAt: now.toISOString(),
+        time: timeStr
+      };
+      onSave(transaction);
     } else {
-    const finalCategory = showNewCategory ? newCategory.trim() : category;
+      const finalCategory = showNewCategory ? newCategory.trim() : category;
       if (!finalCategory) return;
     
-    if (showNewCategory && newCategory.trim()) {
-      onAddCategory(newCategory.trim());
-    }
+      if (showNewCategory && newCategory.trim()) {
+        onAddCategory(newCategory.trim());
+      }
     
-    onSave({
-      id: uuid(),
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+      const transaction: Transaction = {
+        id: uuid(),
         type: activeTab,
-      amount: numAmount,
-      date,
-      walletId,
-      category: finalCategory,
-      comment: comment.trim() || undefined,
-      createdAt: new Date().toISOString()
-    });
+        amount: numAmount,
+        date,
+        walletId,
+        category: finalCategory,
+        comment: comment.trim() || undefined,
+        createdAt: now.toISOString(),
+        time: timeStr
+      };
+      onSave(transaction);
     }
     
     // Сбрасываем начальное значение после сохранения
     initialValueRef.current = null;
-  };
+  }, [amount, walletId, activeTab, toWalletId, exchangeRate, isSameCurrency, date, comment, showNewCategory, newCategory, category, onSave, onAddCategory]);
   
   // Экспорт hasChanges и save через ref
   useImperativeHandle(ref, () => ({
     hasChanges,
     save: handleSave
-  }), [hasChanges]);
+  }), [hasChanges, handleSave]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

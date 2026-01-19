@@ -130,9 +130,19 @@ export function FinancePage() {
     if (tx.type === 'transfer') {
       const toWallet = getWallet(tx.toWalletId || '');
       const toAmount = tx.toAmount || tx.amount;
+      
+      // Формируем subtitle с временем и комментарием
+      let subtitle = 'Перевод';
+      if (tx.time) {
+        subtitle = `${tx.time} · ${subtitle}`;
+      }
+      if (tx.comment) {
+        subtitle = tx.time ? `${tx.time} · ${tx.comment}` : tx.comment;
+      }
+      
       return {
         title: `${wallet?.name || '?'} → ${toWallet?.name || '?'}`,
-        subtitle: tx.comment || 'Перевод',
+        subtitle: subtitle,
         amountFrom: formatMoney(tx.amount, wallet?.currency), // Списано (красным)
         amountTo: formatMoney(toAmount, toWallet?.currency), // Зачислено (зеленым)
         color: wallet?.color || '#6B7280',
@@ -142,9 +152,14 @@ export function FinancePage() {
       };
     }
     
+    // Формируем категорию с временем, если оно есть
+    const categoryWithTime = tx.time 
+      ? `${tx.time} · ${tx.category}`
+      : tx.category;
+    
     return {
       title: wallet?.name || 'Неизвестный кошелёк',
-      subtitle: tx.category,
+      subtitle: categoryWithTime,
       amount: (tx.type === 'income' ? '+' : '-') + formatMoney(tx.amount, wallet?.currency),
       color: wallet?.color || '#6B7280',
       wallet: wallet,
@@ -410,8 +425,11 @@ export function FinancePage() {
           onChangesChange={setTransactionFormHasChanges}
           onSave={(tx) => {
             handleSaveTransaction(tx);
-            setShowForm(false);
-            setTransactionFormHasChanges(false);
+            // Используем setTimeout чтобы убедиться, что состояние успело обновиться
+            setTimeout(() => {
+              setShowForm(false);
+              setTransactionFormHasChanges(false);
+            }, 0);
           }}
           onCancel={() => {
             setShowForm(false);

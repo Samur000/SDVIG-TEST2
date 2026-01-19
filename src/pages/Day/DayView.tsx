@@ -121,32 +121,72 @@ export function DayView({ date, events, onEventClick }: DayViewProps) {
         <div className="day-view-events">
           {(() => {
             // Вычисляем смещения для групп, которые не должны накладываться
+            // Важно: группы, которые конфликтуют, уже сгруппированы вместе и отображаются рядом по горизонтали
+            // Смещение нужно только для случаев, когда неконфликтующие группы перекрываются по времени
             const groupTopOffsets = new Map<number, number>();
+            
             eventGroups.forEach((group, groupIndex) => {
               if (group.length === 0) return;
-              const firstEvent = group[0];
-              if (!firstEvent.startTime) return;
-              const firstStartTime = typeof firstEvent.startTime === 'string' ? new Date(firstEvent.startTime) : firstEvent.startTime;
-              const firstTop = getEventTop(firstStartTime);
               
-              // Проверяем, не накладывается ли эта группа с предыдущими
+              // Находим самое раннее начало и самое позднее окончание в группе
+              let groupStartTop = Infinity;
+              let groupEndBottom = -Infinity;
+              
+              group.forEach(event => {
+                if (!event.startTime || !event.endTime) return;
+                const startTime = typeof event.startTime === 'string' ? new Date(event.startTime) : event.startTime;
+                const endTime = typeof event.endTime === 'string' ? new Date(event.endTime) : event.endTime;
+                const top = getEventTop(startTime);
+                const height = getEventHeight(startTime, endTime);
+                const bottom = top + height;
+                
+                groupStartTop = Math.min(groupStartTop, top);
+                groupEndBottom = Math.max(groupEndBottom, bottom);
+              });
+              
+              if (groupStartTop === Infinity) return;
+              
+              // Проверяем, есть ли конфликты с предыдущими группами по времени
               let offset = 0;
+              
+              // Проверяем все предыдущие группы
               for (let i = 0; i < groupIndex; i++) {
                 const prevGroup = eventGroups[i];
                 if (prevGroup.length === 0) continue;
-                const prevFirstEvent = prevGroup[0];
-                if (!prevFirstEvent.startTime || !prevFirstEvent.endTime) continue;
-                const prevStartTime = typeof prevFirstEvent.startTime === 'string' ? new Date(prevFirstEvent.startTime) : prevFirstEvent.startTime;
-                const prevEndTime = typeof prevFirstEvent.endTime === 'string' ? new Date(prevFirstEvent.endTime) : prevFirstEvent.endTime;
-                const prevTop = getEventTop(prevStartTime);
-                const prevHeight = getEventHeight(prevStartTime, prevEndTime);
                 
-                // Если группы начинаются в одно время, но не пересекаются, смещаем текущую группу
-                if (firstTop === prevTop && !eventsOverlap(firstEvent, prevFirstEvent)) {
-                  const prevOffset = groupTopOffsets.get(i) || 0;
-                  offset = Math.max(offset, prevHeight + prevOffset);
+                // Находим границы предыдущей группы
+                let prevGroupStartTop = Infinity;
+                let prevGroupEndBottom = -Infinity;
+                
+                prevGroup.forEach(event => {
+                  if (!event.startTime || !event.endTime) return;
+                  const startTime = typeof event.startTime === 'string' ? new Date(event.startTime) : event.startTime;
+                  const endTime = typeof event.endTime === 'string' ? new Date(event.endTime) : event.endTime;
+                  const top = getEventTop(startTime);
+                  const height = getEventHeight(startTime, endTime);
+                  const bottom = top + height;
+                  
+                  prevGroupStartTop = Math.min(prevGroupStartTop, top);
+                  prevGroupEndBottom = Math.max(prevGroupEndBottom, bottom);
+                });
+                
+                if (prevGroupStartTop === Infinity) continue;
+                
+                const prevOffset = groupTopOffsets.get(i) || 0;
+                const prevGroupEndBottomWithOffset = prevGroupEndBottom + prevOffset;
+                
+                // Если группы пересекаются по времени (независимо от того, начинаются ли они в одно время),
+                // и текущая группа не конфликтует с предыдущей (они уже в разных группах),
+                // то смещаем текущую группу вниз
+                if (groupStartTop < prevGroupEndBottom && groupEndBottom > prevGroupStartTop) {
+                  // Группы перекрываются по времени, но не конфликтуют (в разных группах)
+                  // Смещаем текущую группу, чтобы она не накладывалась на предыдущую
+                  if (groupStartTop < prevGroupEndBottomWithOffset) {
+                    offset = Math.max(offset, prevGroupEndBottomWithOffset - groupStartTop);
+                  }
                 }
               }
+              
               if (offset > 0) {
                 groupTopOffsets.set(groupIndex, offset);
               }

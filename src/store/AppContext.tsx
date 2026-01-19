@@ -17,6 +17,7 @@ import {
   Task, 
   Habit, 
   Idea, 
+  Folder,
   Profile, 
   Document,
   FocusSession,
@@ -82,6 +83,12 @@ type Action =
   | { type: 'ADD_IDEA'; payload: Idea }
   | { type: 'UPDATE_IDEA'; payload: Idea }
   | { type: 'DELETE_IDEA'; payload: string }
+  | { type: 'TOGGLE_IDEA_PIN'; payload: string }
+  | { type: 'MOVE_IDEA_TO_FOLDER'; payload: { id: string; folderId: string | null } }
+  // Папки заметок
+  | { type: 'ADD_FOLDER'; payload: Folder }
+  | { type: 'UPDATE_FOLDER'; payload: Folder }
+  | { type: 'DELETE_FOLDER'; payload: string }
   // Профиль
   | { type: 'UPDATE_PROFILE'; payload: Profile }
   // Документы
@@ -573,10 +580,57 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_IDEA':
       return {
         ...state,
-        ideas: state.ideas.map(i => i.id === action.payload.id ? action.payload : i)
+        ideas: state.ideas.map(i => {
+          if (i.id === action.payload.id) {
+            // Миграция старых заметок: добавляем недостающие поля
+            return {
+              ...i,
+              title: action.payload.title,
+              text: action.payload.text || i.text,
+              tags: action.payload.tags || [],
+              folderId: action.payload.folderId !== undefined ? action.payload.folderId : (i.folderId || null),
+              isPinned: action.payload.isPinned !== undefined ? action.payload.isPinned : (i.isPinned || false),
+              status: action.payload.status || (i.status || 'inbox'),
+              imageBase64: action.payload.imageBase64,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return i;
+        })
       };
     case 'DELETE_IDEA':
       return { ...state, ideas: state.ideas.filter(i => i.id !== action.payload) };
+    case 'TOGGLE_IDEA_PIN':
+      return {
+        ...state,
+        ideas: state.ideas.map(i => 
+          i.id === action.payload ? { ...i, isPinned: !i.isPinned } : i
+        )
+      };
+    case 'MOVE_IDEA_TO_FOLDER':
+      return {
+        ...state,
+        ideas: state.ideas.map(i => 
+          i.id === action.payload.id ? { ...i, folderId: action.payload.folderId } : i
+        )
+      };
+    // Папки заметок
+    case 'ADD_FOLDER':
+      return { ...state, folders: [...state.folders, action.payload] };
+    case 'UPDATE_FOLDER':
+      return {
+        ...state,
+        folders: state.folders.map(f => f.id === action.payload.id ? action.payload : f)
+      };
+    case 'DELETE_FOLDER':
+      // При удалении папки, перемещаем все заметки в Инбокс
+      return {
+        ...state,
+        folders: state.folders.filter(f => f.id !== action.payload),
+        ideas: state.ideas.map(i => 
+          i.folderId === action.payload ? { ...i, folderId: null } : i
+        )
+      };
 
     // Профиль
     case 'UPDATE_PROFILE':
@@ -869,6 +923,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
           wallets: migrated.wallets,
           transactions: migrated.transactions
         };
+        
+        // Миграция заметок к новому формату (с папками, тегами, статусами)
+        if (withDefaults.ideas && withDefaults.ideas.length > 0) {
+          withDefaults.ideas = withDefaults.ideas.map(idea => {
+            // Если заметка уже в новом формате, оставляем как есть
+            if ('tags' in idea && 'folderId' in idea && 'isPinned' in idea) {
+              return idea;
+            }
+            // Миграция старого формата
+            return {
+              ...idea,
+              title: undefined,
+              text: idea.text || '',
+              tags: [],
+              folderId: null,
+              isPinned: false,
+              status: idea.status === 'processed' ? 'archived' : 'inbox',
+              imageBase64: undefined
+            };
+          });
+        }
+        
+        // Добавляем папки по умолчанию, если их нет
+        if (!withDefaults.folders || withDefaults.folders.length === 0) {
+          withDefaults.folders = [
+            { id: 'inbox', name: 'Инбокс', color: '#6B7280', icon: '📥', order: 0 },
+            { id: 'work', name: 'Работа', color: '#3B82F6', icon: '💼', order: 1 },
+            { id: 'home', name: 'Дом', color: '#10B981', icon: '🏠', order: 2 },
+            { id: 'ideas', name: 'Идеи', color: '#F59E0B', icon: '💡', order: 3 },
+            { id: 'projects', name: 'Проекты', color: '#8B5CF6', icon: '🚀', order: 4 }
+          ];
+        }
         
         dispatch({ type: 'LOAD_STATE', payload: withDefaults });
         

@@ -181,6 +181,7 @@ export interface Transaction {
   category: string;
   comment?: string;
   createdAt?: string; // ISO string для сортировки по времени
+  time?: string; // Время выполнения операции в формате HH:MM
   // Поля для переводов
   toWalletId?: string; // Кошелек назначения (для transfer)
   toAmount?: number; // Сумма зачисления (для мультивалютных переводов)
@@ -226,13 +227,28 @@ export interface Habit {
 }
 
 // ============ Инбокс ============
-export type IdeaStatus = 'active' | 'processed';
+export type IdeaStatus = 'inbox' | 'archived';
+
+// Папка (категория) для заметок
+export interface Folder {
+  id: string;
+  name: string;
+  color: string; // hex цвет
+  icon: string; // эмодзи или название иконки
+  order: number; // порядок отображения
+}
 
 export interface Idea {
   id: string;
-  text: string;
+  title?: string; // Опциональный заголовок (первая строка или отдельное поле)
+  text: string; // Основной текст заметки
+  tags: string[]; // Теги (например, #идея, #код)
+  folderId: string | null; // ID папки (null = Инбокс)
+  isPinned: boolean; // Закреплено
+  status: IdeaStatus; // inbox | archived
+  imageBase64?: string; // Прикрепленное фото (base64)
   createdAt: string; // ISO string
-  status: IdeaStatus;
+  updatedAt?: string; // ISO string
 }
 
 // ============ Профиль ============
@@ -307,6 +323,7 @@ export interface AppState {
   
   // Инбокс
   ideas: Idea[];
+  folders: Folder[]; // Папки для заметок
   
   // Профиль
   profile: Profile;
@@ -361,6 +378,13 @@ export const initialState: AppState = {
   tasks: [],
   habits: [],
   ideas: [],
+  folders: [
+    { id: 'inbox', name: 'Инбокс', color: '#6B7280', icon: '📥', order: 0 },
+    { id: 'work', name: 'Работа', color: '#3B82F6', icon: '💼', order: 1 },
+    { id: 'home', name: 'Дом', color: '#10B981', icon: '🏠', order: 2 },
+    { id: 'ideas', name: 'Идеи', color: '#F59E0B', icon: '💡', order: 3 },
+    { id: 'projects', name: 'Проекты', color: '#8B5CF6', icon: '🚀', order: 4 }
+  ],
   profile: {
     name: '',
     bio: '',
