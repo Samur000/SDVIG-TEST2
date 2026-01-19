@@ -6,7 +6,6 @@ import {
   getEventTop, 
   getEventHeight,
   groupConflictingEvents,
-  eventsOverlap,
   formatTime,
   getCurrentTimePosition
 } from './CalendarUtils';

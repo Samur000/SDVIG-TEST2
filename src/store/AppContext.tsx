@@ -17,6 +17,7 @@ import {
   Task, 
   Habit, 
   Idea, 
+  IdeaStatus,
   Folder,
   Profile, 
   Document,
@@ -926,20 +927,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         // Миграция заметок к новому формату (с папками, тегами, статусами)
         if (withDefaults.ideas && withDefaults.ideas.length > 0) {
-          withDefaults.ideas = withDefaults.ideas.map(idea => {
+          withDefaults.ideas = withDefaults.ideas.map((idea: any): Idea => {
             // Если заметка уже в новом формате, оставляем как есть
             if ('tags' in idea && 'folderId' in idea && 'isPinned' in idea) {
-              return idea;
+              return idea as Idea;
             }
             // Миграция старого формата
             return {
               ...idea,
               title: undefined,
-              text: idea.text || '',
+              text: (idea.text as string) || '',
               tags: [],
               folderId: null,
               isPinned: false,
-              status: idea.status === 'processed' ? 'archived' : 'inbox',
+              status: (idea.status === 'processed' ? 'archived' : 'inbox') as IdeaStatus,
               imageBase64: undefined
             };
           });
