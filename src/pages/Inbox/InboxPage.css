@@ -33,18 +33,61 @@
 .inbox-notes-list-simple {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 24px;
+  padding: 0 20px;
+}
+
+.inbox-notes-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.inbox-note-item-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.inbox-notes-group-header {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  padding: 8px 0 4px 0;
+  text-transform: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inbox-notes-group-header.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.inbox-notes-group-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+  transition: transform 0.3s ease;
+}
+
+.inbox-notes-group-content {
+  transition: max-height 0.3s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 
 .inbox-note-item {
   position: relative;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   overflow: hidden;
-}
-
-.inbox-note-item:first-child {
-  border-top: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  z-index: 1;
 }
 
 .inbox-note-item.pinned {
@@ -55,10 +98,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 10px 13px;
   cursor: pointer;
   transition: background 0.2s ease;
   gap: 12px;
+  position: relative;
+  z-index: 2;
 }
 
 .inbox-note-item-content:hover {
@@ -118,25 +163,34 @@
   color: var(--text-tertiary);
 }
 
-.inbox-swipe-indicator.left {
+.inbox-swipe-action-btn {
   position: absolute;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #f59e0b;
+  top: 0;
+  bottom: 0;
+  width: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  z-index: 1;
+  z-index: 0;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
-.inbox-swipe-indicator.left svg {
-  width: 20px;
-  height: 20px;
+.inbox-swipe-action-btn.delete {
+  right: 0;
+  background: #ef4444;
+  color: white;
+}
+
+.inbox-swipe-action-btn.pin {
+  left: 0;
+  background: #6b7280;
+  color: white;
+}
+
+.inbox-swipe-action-btn svg {
+  width: 24px;
+  height: 24px;
 }
 
 .inbox-header {

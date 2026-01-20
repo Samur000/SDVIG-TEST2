@@ -40,6 +40,9 @@ export function InboxPage() {
   // Выбранная папка для фильтрации
   const [activeFolderId, setActiveFolderId] = useState<string | null>('inbox');
   
+  // Состояние свернутости группы "Закреплено"
+  const [isPinnedCollapsed, setIsPinnedCollapsed] = useState(false);
+  
   // Модалки
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
@@ -168,6 +171,14 @@ export function InboxPage() {
 
   // Обработка свайпов
   const handleTouchStart = (ideaId: string, e: React.TouchEvent) => {
+    // Если начинаем свайп другой заметки, сбрасываем все предыдущие
+    const currentSwiped = Object.keys(swipeOffset).find(id => swipeOffset[id] !== 0);
+    if (currentSwiped && currentSwiped !== ideaId) {
+      const updatedOffsets = { ...swipeOffset };
+      updatedOffsets[currentSwiped] = 0;
+      setSwipeOffset(updatedOffsets);
+    }
+    
     swipeStartX.current = e.touches[0].clientX;
     swipeCurrentX.current = e.touches[0].clientX;
     swipingIdeaId.current = ideaId;
@@ -178,7 +189,7 @@ export function InboxPage() {
     swipeCurrentX.current = e.touches[0].clientX;
     const diff = swipeCurrentX.current - swipeStartX.current;
     
-    // Ограничиваем свайп
+    // Ограничиваем свайп (влево = отрицательное, вправо = положительное)
     const maxSwipe = 80;
     setSwipeOffset({
       ...swipeOffset,
@@ -191,45 +202,163 @@ export function InboxPage() {
     
     const offset = swipeOffset[ideaId] || 0;
     
-    // Если свайпнули влево больше 50px - закрепление
-    if (offset < -50) {
-      dispatch({ type: 'TOGGLE_IDEA_PIN', payload: ideaId });
+    // Сбрасываем все другие свайпнутые элементы
+    const updatedOffsets: Record<string, number> = {};
+    Object.keys(swipeOffset).forEach(id => {
+      if (id !== ideaId) {
+        updatedOffsets[id] = 0;
+      }
+    });
+    
+    // Если свайпнули влево больше 50px - показываем кнопку удаления
+    // Если свайпнули вправо больше 50px - показываем кнопку закрепления
+    // Оставляем карточку в позиции если свайп был достаточно сильным
+    if (Math.abs(offset) < 50) {
+      // Сброс позиции если свайп был слишком слабым
+      updatedOffsets[ideaId] = 0;
+    } else {
+      // Фиксируем позицию
+      const targetOffset = offset < 0 ? -80 : 80;
+      updatedOffsets[ideaId] = targetOffset;
     }
     
-    // Сброс позиции
+    setSwipeOffset(updatedOffsets);
+    swipingIdeaId.current = null;
+  };
+
+  // Обработка клика на кнопку удаления (при свайпе влево)
+  const handleDeleteClick = (ideaId: string) => {
+    if (window.confirm('Удалить заметку?')) {
+      dispatch({ type: 'DELETE_IDEA', payload: ideaId });
+      setSwipeOffset({
+        ...swipeOffset,
+        [ideaId]: 0
+      });
+    }
+  };
+
+  // Обработка клика на кнопку закрепления (при свайпе вправо)
+  const handlePinClick = (ideaId: string) => {
+    dispatch({ type: 'TOGGLE_IDEA_PIN', payload: ideaId });
     setSwipeOffset({
       ...swipeOffset,
       [ideaId]: 0
     });
-    swipingIdeaId.current = null;
   };
 
-  // Форматирование даты (короткий формат для списка)
-  const formatIdeaDate = (dateStr: string) => {
+  // Сброс свайпа при клике вне карточки
+  const handleItemClick = (ideaId: string, e: React.MouseEvent) => {
+    const offset = swipeOffset[ideaId] || 0;
+    if (Math.abs(offset) > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Сбрасываем все свайпнутые элементы
+      const updatedOffsets: Record<string, number> = {};
+      Object.keys(swipeOffset).forEach(id => {
+        updatedOffsets[id] = 0;
+      });
+      setSwipeOffset(updatedOffsets);
+    }
+  };
+
+  // Форматирование времени создания (показываем только время)
+  const formatIdeaTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return formatTime(date);
+  };
+
+  // Получение названия группы для заметки
+  const getNoteGroup = (dateStr: string): { key: string; label: string } => {
     const date = new Date(dateStr);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const ideaDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
+    // Сегодня
     if (ideaDate.getTime() === today.getTime()) {
-      return formatTime(date);
+      return { key: 'today', label: 'Сегодня' };
     }
     
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (ideaDate.getTime() === yesterday.getTime()) {
-      return 'Вчера';
+    // Предыдущие 7 дней
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    if (ideaDate >= sevenDaysAgo && ideaDate < today) {
+      return { key: 'last7days', label: 'Предыдущие 7 дней' };
     }
     
-    // Если в этом году - показываем только дату, иначе дату и год
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    if (ideaDate.getFullYear() === now.getFullYear()) {
-      return `${day}.${month}`;
+    // Предыдущие 30 дней
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    if (ideaDate >= thirtyDaysAgo && ideaDate < sevenDaysAgo) {
+      return { key: 'last30days', label: 'Предыдущие 30 дней' };
     }
+    
+    // Старше 30 дней - месяц и год
+    const monthNames = [
+      'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+      'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+    ];
+    const monthName = monthNames[date.getMonth()];
     const year = date.getFullYear();
-    return `${day}.${month}.${year}`;
+    const key = `${year}-${date.getMonth()}`;
+    return { key, label: `${monthName} ${year}` };
   };
+
+  // Группировка заметок
+  const groupedIdeas = useMemo(() => {
+    // Разделяем закрепленные и незакрепленные заметки
+    const pinnedIdeas = filteredIdeas.filter(idea => idea.isPinned);
+    const unpinnedIdeas = filteredIdeas.filter(idea => !idea.isPinned);
+    
+    const groups: Record<string, Idea[]> = {};
+    
+    // Группируем незакрепленные заметки
+    unpinnedIdeas.forEach(idea => {
+      const group = getNoteGroup(idea.createdAt);
+      if (!groups[group.key]) {
+        groups[group.key] = [];
+      }
+      groups[group.key].push(idea);
+    });
+    
+    // Определяем порядок групп
+    const groupOrder = ['today', 'last7days', 'last30days'];
+    
+    // Сортируем ключи групп для незакрепленных
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const aIndex = groupOrder.indexOf(a);
+      const bIndex = groupOrder.indexOf(b);
+      
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      
+      // Для групп с месяцами сортируем по убыванию (новые выше)
+      return b.localeCompare(a);
+    });
+    
+    const unpinnedGroups = sortedKeys.map(key => ({
+      key,
+      label: getNoteGroup(groups[key][0].createdAt).label,
+      ideas: groups[key],
+      isPinned: false
+    }));
+    
+    // Если есть закрепленные заметки, добавляем их группу первой
+    const result = [];
+    if (pinnedIdeas.length > 0) {
+      result.push({
+        key: 'pinned',
+        label: 'Закреплено',
+        ideas: pinnedIdeas,
+        isPinned: true
+      });
+    }
+    
+    return [...result, ...unpinnedGroups];
+  }, [filteredIdeas]);
 
   // Обработчики для NoteEditor
   const handleNoteSave = (idea: Idea) => {
@@ -288,6 +417,7 @@ export function InboxPage() {
         onMoveToFolder={handleNoteMoveToFolder}
         onAddToTask={handleNoteAddToTask}
         onAddToSchedule={handleNoteAddToSchedule}
+        onTogglePin={(id) => dispatch({ type: 'TOGGLE_IDEA_PIN', payload: id })}
       />
     );
   }
@@ -577,66 +707,128 @@ export function InboxPage() {
           />
         ) : (
           <div className="inbox-notes-list-simple">
-            {filteredIdeas.map(idea => {
-              const offset = swipeOffset[idea.id] || 0;
-              const isSwipingLeft = offset < 0;
-              const folder = idea.folderId ? folders.find(f => f.id === idea.folderId) : null;
-              const title = idea.title || idea.text || 'Без названия';
-              const titleDisplay = title.length > 60 ? title.substring(0, 60) + '...' : title;
-
+            {groupedIdeas.map(group => {
+              const isPinnedGroup = group.isPinned;
+              const isCollapsed = isPinnedGroup && isPinnedCollapsed;
+              
               return (
-                <div
-                  key={idea.id}
-                  className={`inbox-note-item ${idea.isPinned ? 'pinned' : ''}`}
-                  onTouchStart={(e) => handleTouchStart(idea.id, e)}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={() => handleTouchEnd(idea.id)}
-                  style={{
-                    transform: `translateX(${offset}px)`,
-                    transition: swipingIdeaId.current === idea.id ? 'none' : 'transform 0.2s ease'
-                  }}
-                >
-                  {/* Индикатор свайпа влево (закрепить) */}
-                  {isSwipingLeft && (
-                    <div className="inbox-swipe-indicator left">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 17v5M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
-                      </svg>
-                    </div>
-                  )}
-
-                  <div
-                    className="inbox-note-item-content"
-                    onClick={() => navigate(`/inbox/note/${idea.id}`)}
+                <div key={group.key} className="inbox-notes-group">
+                  <div 
+                    className={`inbox-notes-group-header ${isPinnedGroup ? 'clickable' : ''}`}
+                    onClick={isPinnedGroup ? () => setIsPinnedCollapsed(!isPinnedCollapsed) : undefined}
                   >
-                    <div className="inbox-note-item-main">
-                      <span className="inbox-note-item-title">
-                        {idea.isPinned && <span className="inbox-note-item-pin-icon">📌</span>}
-                        {titleDisplay === 'Без названия' ? (
-                          <span style={{ color: 'var(--text-tertiary)' }}>Без названия</span>
-                        ) : (
-                          titleDisplay
-                        )}
-                      </span>
-                      <div className="inbox-note-item-meta">
-                        <span className="inbox-note-item-date">{formatIdeaDate(idea.createdAt)}</span>
-                        {folder && folder.id !== 'inbox' && (
-                          <span 
-                            className="inbox-note-item-folder"
-                            style={{ 
-                              backgroundColor: folder.color + '20',
-                              color: folder.color 
+                    <span>{group.label}</span>
+                    {isPinnedGroup && (
+                      <svg 
+                        className="inbox-notes-group-chevron"
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                        style={{
+                          transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.3s ease'
+                        }}
+                      >
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div 
+                    className="inbox-notes-group-content"
+                    style={{
+                      maxHeight: isCollapsed ? '0' : '1000px',
+                      overflow: 'hidden',
+                      transition: 'max-height 0.3s ease'
+                    }}
+                  >
+                    {group.ideas.map(idea => {
+                      const offset = swipeOffset[idea.id] || 0;
+                      const folder = idea.folderId ? folders.find(f => f.id === idea.folderId) : null;
+                      const title = idea.title || idea.text || 'Без названия';
+                      const titleDisplay = title.length > 60 ? title.substring(0, 60) + '...' : title;
+
+                      return (
+                        <div key={idea.id} className="inbox-note-item-wrapper">
+                          {/* Кнопка удаления (справа, показывается при свайпе влево) */}
+                          {offset < -40 && (
+                            <div className="inbox-swipe-action-btn delete" onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(idea.id);
+                            }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                              </svg>
+                            </div>
+                          )}
+
+                          {/* Кнопка закрепления (слева, показывается при свайпе вправо) */}
+                          {offset > 40 && (
+                            <div className="inbox-swipe-action-btn pin" onClick={(e) => {
+                              e.stopPropagation();
+                              handlePinClick(idea.id);
+                            }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 17v5M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+                              </svg>
+                            </div>
+                          )}
+
+                          <div
+                            className={`inbox-note-item ${idea.isPinned ? 'pinned' : ''}`}
+                            onTouchStart={(e) => handleTouchStart(idea.id, e)}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={() => handleTouchEnd(idea.id)}
+                            onClick={(e) => handleItemClick(idea.id, e)}
+                            style={{
+                              transform: `translateX(${offset}px)`,
+                              transition: swipingIdeaId.current === idea.id ? 'none' : 'transform 0.2s ease'
                             }}
-                            title={folder.name}
                           >
-                            {folder.icon}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <svg className="inbox-note-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="9 18 15 12 9 6"/>
-                    </svg>
+                            <div
+                              className="inbox-note-item-content"
+                              onClick={() => {
+                                if (Math.abs(offset) < 10) {
+                                  navigate(`/inbox/note/${idea.id}`);
+                                }
+                              }}
+                            >
+                            <div className="inbox-note-item-main">
+                              <span className="inbox-note-item-title">
+                                {titleDisplay === 'Без названия' ? (
+                                  <span style={{ color: 'var(--text-tertiary)' }}>Без названия</span>
+                                ) : (
+                                  titleDisplay
+                                )}
+                              </span>
+                              <div className="inbox-note-item-meta">
+                                <span className="inbox-note-item-date">
+                                  {isPinnedGroup ? 'Закреплено' : formatIdeaTime(idea.createdAt)}
+                                </span>
+                                {folder && folder.id !== 'inbox' && (
+                                  <span 
+                                    className="inbox-note-item-folder"
+                                    style={{ 
+                                      backgroundColor: folder.color + '20',
+                                      color: folder.color 
+                                    }}
+                                    title={folder.name}
+                                  >
+                                    {folder.icon}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <svg className="inbox-note-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                          </div>
+                        </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

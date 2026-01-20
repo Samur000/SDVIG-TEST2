@@ -35,15 +35,14 @@
   cursor: pointer;
   padding: 4px 8px;
   border-radius: var(--radius);
-  transition: background 0.2s;
-  border: 1px solid #0f766d80;
+  transition: 0.2s ease-in-out;
+  border: 1px solid var(--border);
   border-radius: 5px;
 }
 
 .note-editor-back:hover {
   background: var(--bg-hover);
   border: 1px solid #0f766db4;
-  background-color: #0f766d2d;
 }
 
 .note-editor-back svg {
@@ -59,11 +58,13 @@
   cursor: pointer;
   padding: 8px;
   border-radius: var(--radius);
-  transition: background 0.2s;
+  transition: 0.2s ease-in-out;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1003;
+  border: 1px solid var(--border);
+  border-radius: 5px;
 }
 
 .note-editor-menu-btn:active {
@@ -82,34 +83,180 @@
 .note-editor-canvas {
   flex: 1;
   padding: 24px 20px;
-  padding-bottom: calc(24px + var(--nav-height) + 12px + var(--safe-area-bottom, 0px));
+  padding-bottom: calc(24px + 44px + var(--nav-height) + 12px + var(--safe-area-bottom, 0px));
   background: var(--bg-primary);
   cursor: text;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.note-editor-textarea {
-  width: 100%;
-  min-height: 100%;
-  border: none;
+/* TipTap редактор */
+.ProseMirror {
   outline: none;
-  background: transparent;
+  min-height: 100%;
   color: var(--text-primary);
   font-size: 16px;
   line-height: 1.6;
   font-family: inherit;
-  resize: none;
-  padding: 0;
 }
 
-.note-editor-textarea::placeholder {
-  color: var(--text-tertiary);
+.ProseMirror p {
+  margin: 0.5em 0;
 }
 
-/* Автоформатирование первой строки как заголовка */
-.note-editor-textarea::first-line {
+.ProseMirror p:first-child {
   font-size: 24px;
   font-weight: 700;
   line-height: 1.4;
+  margin-top: 0;
+}
+
+.ProseMirror h1 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0.5em 0;
+}
+
+.ProseMirror h2 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0.5em 0;
+}
+
+.ProseMirror h3 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0.5em 0;
+}
+
+.ProseMirror strong {
+  font-weight: 700;
+}
+
+.ProseMirror em {
+  font-style: italic;
+}
+
+.ProseMirror u {
+  text-decoration: underline;
+}
+
+.ProseMirror s {
+  text-decoration: line-through;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.ProseMirror li {
+  margin: 0.25em 0;
+  font-size: 16px !important; /* Размер текста в списках не меняется */
+  line-height: 1.6;
+  font-weight: normal !important; /* Списки не жирные по умолчанию */
+}
+
+.ProseMirror li p {
+  font-size: 16px !important;
+  margin: 0;
+  font-weight: normal !important;
+}
+
+.ProseMirror ul li,
+.ProseMirror ol li {
+  font-size: 16px !important;
+  font-weight: normal !important;
+}
+
+.ProseMirror a {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ProseMirror a:active,
+.ProseMirror a:hover {
+  opacity: 0.8;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  height: 0;
+}
+
+.note-editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-tertiary);
+}
+
+/* Стили для чекбоксов */
+.note-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0.25em 0; /* Такое же расстояние, как между элементами списка */
+  padding: 0;
+}
+
+.note-checkbox-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  line-height: 1;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s;
+  margin-top: 2px;
+}
+
+.note-checkbox-icon:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.note-checkbox.checked .note-checkbox-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.note-checkbox.checked .note-checkbox-icon::before {
+  content: '✓';
+}
+
+.note-checkbox:not(.checked) .note-checkbox-icon::before {
+  content: '';
+}
+
+.note-checkbox-content {
+  flex: 1;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.note-checkbox-content.checked {
+  font-style: italic;
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 
 /* Dropdown меню */
@@ -197,4 +344,102 @@
 .note-editor-menu-icon svg {
   width: 100%;
   height: 100%;
+}
+
+/* Панель форматирования */
+.note-editor-format-bar {
+  position: fixed;
+  bottom: calc(var(--nav-height) + 12px + var(--safe-area-bottom, 0px));
+  left: 0;
+  right: 0;
+  height: 44px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  z-index: 998;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.note-editor-format-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  position: relative;
+  height: 100%;
+}
+
+.note-editor-format-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.note-editor-format-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 100%;
+  min-width: max-content;
+  justify-content: space-around;
+}
+
+.note-editor-format-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.note-editor-format-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.note-editor-format-btn:active {
+  background: rgba(0, 0, 0, 0.1);
+  transform: scale(0.95);
+}
+
+.note-editor-format-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+[data-theme="dark"] .note-editor-format-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .note-editor-format-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.note-editor-format-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
+
+.note-editor-format-gradient {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40px;
+  height: 100%;
+  background: linear-gradient(to right, transparent, var(--bg-secondary));
+  pointer-events: none;
+  z-index: 1;
 }
