@@ -6,7 +6,6 @@ import { EmptyState } from '../../components/UI';
 import { useApp } from '../../store/AppContext';
 import { Idea, Folder } from '../../types';
 import { v4 as uuid } from 'uuid';
-import { formatDate } from '../../utils/date';
 import { NoteEditor } from './NoteEditor';
 import './InboxPage.css';
 import './NoteEditor.css';

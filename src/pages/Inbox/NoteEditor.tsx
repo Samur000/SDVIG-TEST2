@@ -45,15 +45,25 @@ export function NoteEditor({
         return;
       }
       
-      if (text !== idea.text) {
-        const lines = text.split('\n').filter(l => l.trim());
-        const title = lines[0] || undefined;
-        const content = lines.length > 1 ? lines.slice(1).join('\n') : (lines[0] || '');
+      // Сравниваем с исходным содержимым
+      const currentContent = idea.title ? `${idea.title}\n${idea.text || ''}` : (idea.text || '');
+      if (text !== currentContent) {
+        // Разделяем на строки БЕЗ фильтрации, чтобы сохранить пустые строки
+        const allLines = text.split('\n');
+        // Находим первую непустую строку для заголовка
+        const firstNonEmptyLineIndex = allLines.findIndex(l => l.trim());
+        const title = firstNonEmptyLineIndex >= 0 && allLines[firstNonEmptyLineIndex].trim().length <= 50 
+          ? allLines[firstNonEmptyLineIndex].trim() 
+          : undefined;
+        // Весь остальной текст (включая пустые строки)
+        const content = firstNonEmptyLineIndex >= 0 && allLines.length > firstNonEmptyLineIndex + 1
+          ? allLines.slice(firstNonEmptyLineIndex + 1).join('\n')
+          : (firstNonEmptyLineIndex >= 0 ? allLines[firstNonEmptyLineIndex] : text);
         
         const updatedIdea: Idea = {
           ...idea,
           title,
-          text: content || text,
+          text: content,
           updatedAt: new Date().toISOString()
         };
         onSave(updatedIdea);
@@ -102,14 +112,22 @@ export function NoteEditor({
     
     // Финальное сохранение перед уходом (для существующих или уже заполненных заметок)
     if (text !== currentContent) {
-      const lines = text.split('\n').filter(l => l.trim());
-      const title = lines[0] || undefined;
-      const content = lines.length > 1 ? lines.slice(1).join('\n') : (lines[0] || '');
+      // Разделяем на строки БЕЗ фильтрации, чтобы сохранить пустые строки
+      const allLines = text.split('\n');
+      // Находим первую непустую строку для заголовка
+      const firstNonEmptyLineIndex = allLines.findIndex(l => l.trim());
+      const title = firstNonEmptyLineIndex >= 0 && allLines[firstNonEmptyLineIndex].trim().length <= 50 
+        ? allLines[firstNonEmptyLineIndex].trim() 
+        : undefined;
+      // Весь остальной текст (включая пустые строки)
+      const content = firstNonEmptyLineIndex >= 0 && allLines.length > firstNonEmptyLineIndex + 1
+        ? allLines.slice(firstNonEmptyLineIndex + 1).join('\n')
+        : (firstNonEmptyLineIndex >= 0 ? allLines[firstNonEmptyLineIndex] : text);
       
       const updatedIdea: Idea = {
         ...idea,
         title,
-        text: content || text,
+        text: content,
         updatedAt: new Date().toISOString()
       };
       onSave(updatedIdea);
