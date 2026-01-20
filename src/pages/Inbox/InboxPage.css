@@ -1,5 +1,144 @@
 /* ===== ИНБОКС - НОВЫЙ ДИЗАЙН ===== */
 
+/* Кнопка добавления в хедере */
+.header-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header-add-btn:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.header-add-btn:active {
+  transform: scale(0.95);
+}
+
+.header-add-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Простой список заметок */
+.inbox-notes-list-simple {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.inbox-note-item {
+  position: relative;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.inbox-note-item:first-child {
+  border-top: 1px solid var(--border);
+}
+
+.inbox-note-item.pinned {
+  background: var(--bg-secondary);
+}
+
+.inbox-note-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  gap: 12px;
+}
+
+.inbox-note-item-content:hover {
+  background: var(--bg-hover);
+}
+
+.inbox-note-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inbox-note-item-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-note-item-pin-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.inbox-note-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.inbox-note-item-date {
+  color: var(--text-tertiary);
+}
+
+.inbox-note-item-folder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.inbox-note-item-chevron {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.inbox-swipe-indicator.left {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 1;
+}
+
+.inbox-swipe-indicator.left svg {
+  width: 20px;
+  height: 20px;
+}
+
 .inbox-header {
   margin-bottom: 20px;
 }

@@ -84,6 +84,7 @@ function AppRoutes() {
         <Route path="/finance" element={<FinancePage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/inbox" element={<InboxPage />} />
+        <Route path="/inbox/note/:id" element={<InboxPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/focus" element={<FocusPage />} />
