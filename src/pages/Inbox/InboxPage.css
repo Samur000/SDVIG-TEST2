@@ -47,6 +47,7 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-md);
+  touch-action: pan-y;
 }
 
 .inbox-notes-group-header {
@@ -88,6 +89,8 @@
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   z-index: 1;
+  touch-action: pan-y pinch-zoom;
+  will-change: transform;
 }
 
 .inbox-note-item.pinned {

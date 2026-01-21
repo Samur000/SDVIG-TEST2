@@ -150,14 +150,22 @@ export function NoteEditor({
   });
 
   // Автоматический фокус на редактор при открытии заметки
+  // Автофокус на заголовок для новых заметок
   useEffect(() => {
     if (editor && !idea.title && !idea.text) {
       // Если заметка новая и пустая, фокусируемся на редакторе
-      setTimeout(() => {
+      // Увеличиваем задержку для мобильных устройств, чтобы клавиатура успела открыться
+      const timeoutId = setTimeout(() => {
         editor.commands.focus('start'); // Фокус в начало (заголовок)
-      }, 100);
+        // Дополнительная попытка через небольшую задержку для надежности
+        setTimeout(() => {
+          editor.commands.focus('start');
+        }, 300);
+      }, 200);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [editor, idea.title, idea.text]);
+  }, [editor, idea.id]); // Используем idea.id чтобы срабатывало при открытии новой заметки
 
   // Обработка пробела для завершения ссылки
   useEffect(() => {
@@ -617,14 +625,16 @@ export function NoteEditor({
           )}
         </div>
       </div>
-      <hr />
 
-      {/* Рабочая область */}
-      <div 
-        className="note-editor-canvas"
-        ref={editorRef}
-      >
-        <EditorContent editor={editor} />
+      {/* Контейнер контента - ключевое для правильного скролла */}
+      <div className="note-editor-content-wrapper">
+        {/* Рабочая область - скролл ТОЛЬКО здесь */}
+        <div 
+          className="note-editor-canvas"
+          ref={editorRef}
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
       {/* Панель форматирования - показывается только при открытой клавиатуре */}

@@ -86,6 +86,16 @@
   height: 20px;
 }
 
+/* Контейнер контента - flex-1 с overflow-hidden */
+.note-editor-content-wrapper {
+  flex: 1;
+  min-height: 0; /* критично для flex child */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Рабочая область - скролл ТОЛЬКО здесь */
 .note-editor-canvas {
   flex: 1;
   padding: 24px 20px;
@@ -96,6 +106,12 @@
   min-height: 0; /* критично для flex child */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.note-editor-canvas::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 /* TipTap редактор */

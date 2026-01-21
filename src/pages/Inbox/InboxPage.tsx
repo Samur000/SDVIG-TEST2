@@ -54,9 +54,11 @@ export function InboxPage() {
   
   // Состояние для свайпов
   const swipeStartX = useRef<number>(0);
+  const swipeStartY = useRef<number>(0);
   const swipeCurrentX = useRef<number>(0);
   const swipingIdeaId = useRef<string | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
+  const isHorizontalSwipe = useRef<boolean>(false);
 
   // Получаем папки, сортируем по order
   const folders = useMemo(() => {
@@ -180,25 +182,50 @@ export function InboxPage() {
     }
     
     swipeStartX.current = e.touches[0].clientX;
+    swipeStartY.current = e.touches[0].clientY;
     swipeCurrentX.current = e.touches[0].clientX;
     swipingIdeaId.current = ideaId;
+    isHorizontalSwipe.current = false; // Сбрасываем флаг
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (swipingIdeaId.current === null) return;
-    swipeCurrentX.current = e.touches[0].clientX;
-    const diff = swipeCurrentX.current - swipeStartX.current;
     
-    // Ограничиваем свайп (влево = отрицательное, вправо = положительное)
-    const maxSwipe = 80;
-    setSwipeOffset({
-      ...swipeOffset,
-      [swipingIdeaId.current]: Math.max(-maxSwipe, Math.min(maxSwipe, diff))
-    });
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - swipeStartX.current;
+    const diffY = Math.abs(currentY - swipeStartY.current);
+    const absDiffX = Math.abs(diffX);
+    
+    // Если горизонтальное движение больше вертикального и больше порога - это горизонтальный свайп
+    if (absDiffX > diffY && absDiffX > 10) {
+      // Определяем что это горизонтальный свайп и блокируем вертикальный скролл
+      if (!isHorizontalSwipe.current) {
+        isHorizontalSwipe.current = true;
+      }
+      
+      swipeCurrentX.current = currentX;
+      
+      // Ограничиваем свайп (влево = отрицательное, вправо = положительное)
+      const maxSwipe = 80;
+      setSwipeOffset({
+        ...swipeOffset,
+        [swipingIdeaId.current]: Math.max(-maxSwipe, Math.min(maxSwipe, diffX))
+      });
+    } else if (isHorizontalSwipe.current) {
+      isHorizontalSwipe.current = false;
+    }
+    // Если это вертикальный жест - ничего не делаем, позволяем скроллить
   };
 
-  const handleTouchEnd = (ideaId: string) => {
+  const handleTouchEnd = (ideaId: string, e?: React.TouchEvent) => {
     if (swipingIdeaId.current !== ideaId) return;
+    
+    // Если был горизонтальный свайп и есть событие, блокируем всплытие
+    if (isHorizontalSwipe.current && e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
     const offset = swipeOffset[ideaId] || 0;
     
@@ -224,6 +251,7 @@ export function InboxPage() {
     
     setSwipeOffset(updatedOffsets);
     swipingIdeaId.current = null;
+    isHorizontalSwipe.current = false; // Сбрасываем флаг
   };
 
   // Обработка клика на кнопку удаления (при свайпе влево)
@@ -779,7 +807,7 @@ export function InboxPage() {
                             className={`inbox-note-item ${idea.isPinned ? 'pinned' : ''}`}
                             onTouchStart={(e) => handleTouchStart(idea.id, e)}
                             onTouchMove={handleTouchMove}
-                            onTouchEnd={() => handleTouchEnd(idea.id)}
+                            onTouchEnd={(e) => handleTouchEnd(idea.id, e)}
                             onClick={(e) => handleItemClick(idea.id, e)}
                             style={{
                               transform: `translateX(${offset}px)`,
