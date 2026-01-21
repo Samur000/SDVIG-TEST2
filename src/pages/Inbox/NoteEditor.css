@@ -14,6 +14,15 @@
   margin: 0 auto;
   width: 100%;
   overflow: hidden;
+  /* Анимация появления страницы */
+  opacity: 0;
+  transform: translateX(30px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+
+.note-editor.visible {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .note-editor-header {
@@ -21,13 +30,44 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border);
   background: var(--bg-primary);
   backdrop-filter: blur(10px);
   min-height: 56px;
   flex-shrink: 0;
   position: relative;
-  z-index: 10;
+  z-index: 100;
+  gap: 12px;
+}
+
+/* Информация о заметке в хедере */
+.note-editor-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.note-editor-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.note-editor-folder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .note-editor-back {
@@ -68,7 +108,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1003;
+  z-index: 101;
   border: 1px solid var(--border);
   border-radius: 5px;
 }
@@ -321,14 +361,19 @@
 
 /* Dropdown меню */
 .note-editor-menu-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1001;
-  background: transparent;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.3);
   pointer-events: auto;
+  animation: fadeIn 0.25s ease;
+}
+
+.note-editor-menu-overlay.closing {
+  animation: fadeOut 0.25s ease forwards;
 }
 
 .note-editor-menu-dropdown {
@@ -337,27 +382,77 @@
   right: 0;
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  z-index: 1002;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  min-width: 220px;
+  z-index: 100;
   overflow: hidden;
-  animation: slideDown 0.2s ease;
+  animation: menuOpen 0.25s cubic-bezier(0.32, 0.72, 0, 1);
   border: 1px solid var(--border);
   pointer-events: auto;
 }
 
-.note-editor-header {
-  position: relative;
+.note-editor-menu-dropdown.closing {
+  animation: menuClose 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
-@keyframes slideDown {
+/* Слайдер для переключения между меню */
+.note-editor-menu-slider {
+  display: flex;
+  width: 200%;
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.note-editor-menu-slider.show-folders {
+  transform: translateX(-50%);
+}
+
+.note-editor-menu-panel {
+  width: 50%;
+  flex-shrink: 0;
+}
+
+.note-editor-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+.note-editor-menu-chevron {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--text-tertiary);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes menuOpen {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-12px) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes menuClose {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.9);
   }
 }
 

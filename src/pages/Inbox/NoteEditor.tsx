@@ -35,14 +35,75 @@ export function NoteEditor({
 }: NoteEditorProps) {
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
-  const [showFolderMenu, setShowFolderMenu] = useState(false);
+  const [menuView, setMenuView] = useState<'main' | 'folders'>('main'); // Какой вид меню показывать
+  const [menuClosing, setMenuClosing] = useState(false); // Для плавного закрытия
+  const [menuSlideDirection, setMenuSlideDirection] = useState<'left' | 'right'>('left'); // Направление слайда
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showLinkConfirmModal, setShowLinkConfirmModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const [clickedLinkUrl, setClickedLinkUrl] = useState('');
+  const [pageVisible, setPageVisible] = useState(false); // Для анимации появления страницы
   const editorRef = useRef<HTMLDivElement>(null);
   const { isVisible: keyboardVisible, height: keyboardHeight } = useKeyboard();
+
+  // Анимация появления страницы
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setPageVisible(true);
+    });
+  }, []);
+
+  // Плавное закрытие меню
+  const closeMenu = useCallback(() => {
+    setMenuClosing(true);
+    setTimeout(() => {
+      setShowMenu(false);
+      setMenuView('main');
+      setMenuClosing(false);
+    }, 250);
+  }, []);
+
+  // Переход к списку папок (слайд влево)
+  const goToFolders = useCallback(() => {
+    setMenuSlideDirection('left');
+    setMenuView('folders');
+  }, []);
+
+  // Возврат к основному меню (слайд вправо)
+  const goToMainMenu = useCallback(() => {
+    setMenuSlideDirection('right');
+    setMenuView('main');
+  }, []);
+
+  // Форматирование даты для отображения в хедере
+  const formatNoteDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const noteDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    
+    if (noteDate.getTime() === today.getTime()) {
+      return `Сегодня, ${time}`;
+    }
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (noteDate.getTime() === yesterday.getTime()) {
+      return `Вчера, ${time}`;
+    }
+    
+    return date.toLocaleDateString('ru-RU', { 
+      day: 'numeric', 
+      month: 'short',
+      year: noteDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    }) + `, ${time}`;
+  };
+
+  // Получаем папку заметки
+  const currentFolder = idea.folderId ? folders.find(f => f.id === idea.folderId) : null;
 
   // Конвертация старого формата (текст) в HTML для TipTap
   const convertToHtml = (idea: Idea): string => {
@@ -206,19 +267,31 @@ export function NoteEditor({
   // Автоматический фокус на редактор при открытии заметки
   // Автофокус на заголовок для новых заметок
   useEffect(() => {
-    if (editor && !idea.title && !idea.text) {
-      // Если заметка новая и пустая, фокусируемся на редакторе
-      // Увеличиваем задержку для мобильных устройств, чтобы клавиатура успела открыться
-      const timeoutId = setTimeout(() => {
-        editor.commands.focus('start'); // Фокус в начало (заголовок)
-        // Дополнительная попытка через небольшую задержку для надежности
-        setTimeout(() => {
+    if (editor) {
+      const isNewNote = !idea.title && !idea.text;
+      
+      if (isNewNote) {
+        // Если заметка новая и пустая, фокусируемся на редакторе
+        // Множественные попытки для надежности на мобильных устройствах
+        const focusAttempts = [100, 300, 500];
+        const timeoutIds: ReturnType<typeof setTimeout>[] = [];
+        
+        focusAttempts.forEach((delay) => {
+          const id = setTimeout(() => {
+            editor.commands.focus('start'); // Фокус в начало (заголовок)
+          }, delay);
+          timeoutIds.push(id);
+        });
+        
+        // Финальная попытка со скроллом
+        const finalId = setTimeout(() => {
           editor.commands.focus('start');
           scrollToCursor();
-        }, 300);
-      }, 200);
-      
-      return () => clearTimeout(timeoutId);
+        }, 600);
+        timeoutIds.push(finalId);
+        
+        return () => timeoutIds.forEach(id => clearTimeout(id));
+      }
     }
   }, [editor, idea.id, scrollToCursor]); // Используем idea.id чтобы срабатывало при открытии новой заметки
 
@@ -534,25 +607,74 @@ export function NoteEditor({
     return <div className="note-editor-loading">Загрузка...</div>;
   }
 
+  // Плавный переход назад
+  const handleBackWithAnimation = () => {
+    setPageVisible(false);
+    setTimeout(() => {
+      handleBack();
+    }, 200);
+  };
+
+  // Фокус в конец текста при клике на пустое место
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    // Закрываем меню если открыто
+    if (showMenu) {
+      closeMenu();
+      return;
+    }
+    
+    // Если клик был не на редакторе (ProseMirror), переносим фокус в конец
+    const target = e.target as HTMLElement;
+    if (!target.closest('.ProseMirror')) {
+      e.preventDefault();
+      editor.commands.focus('end');
+    }
+  };
+
   return (
-    <div className="note-editor">
+    <div className={`note-editor ${pageVisible ? 'visible' : ''}`}>
+      {/* Overlay для меню - вынесен за пределы хедера */}
+      {(showMenu || menuClosing) && (
+        <div 
+          className={`note-editor-menu-overlay ${menuClosing ? 'closing' : ''}`} 
+          onClick={closeMenu} 
+        />
+      )}
+
       {/* Хедер */}
       <div className="note-editor-header">
-        <button className="note-editor-back" onClick={handleBack}>
+        <button className="note-editor-back" onClick={handleBackWithAnimation}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
         </button>
 
-        
+        {/* Информация о заметке */}
+        <div className="note-editor-info">
+          <span className="note-editor-date">
+            {formatNoteDate(idea.createdAt)}
+          </span>
+          {currentFolder && (
+            <span 
+              className="note-editor-folder-badge"
+              style={{ backgroundColor: currentFolder.color + '20', color: currentFolder.color }}
+            >
+              {currentFolder.icon} {currentFolder.name}
+            </span>
+          )}
+        </div>
         
         <div style={{ position: 'relative' }}>
           <button 
             className="note-editor-menu-btn"
             onClick={(e) => {
               e.stopPropagation();
-              setShowMenu(!showMenu);
-              setShowFolderMenu(false);
+              if (showMenu) {
+                closeMenu();
+              } else {
+                setShowMenu(true);
+                setMenuView('main');
+              }
             }}
             type="button"
           >
@@ -563,177 +685,169 @@ export function NoteEditor({
             </svg>
           </button>
           
-          {/* Dropdown меню - основное */}
-          {showMenu && !showFolderMenu && (
-            <>
-              <div className="note-editor-menu-overlay" onClick={() => setShowMenu(false)} />
-              <div className="note-editor-menu-dropdown" onClick={(e) => e.stopPropagation()}>
-                <div className="note-editor-menu-content">
-                  <button 
-                    className="note-editor-menu-item"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setShowMenu(false);
-                      setTimeout(() => {
-                        setShowFolderMenu(true);
-                      }, 100);
-                    }}
-                  >
-                    <span className="note-editor-menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                      </svg>
-                    </span>
-                    <span>Переместить в папку</span>
-                  </button>
-                  
-                  <button 
-                    className="note-editor-menu-item"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      onTogglePin(idea.id);
-                    }}
-                  >
-                    <span className="note-editor-menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 17v5M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
-                      </svg>
-                    </span>
-                    <span>{idea.isPinned ? 'Открепить' : 'Закрепить'}</span>
-                  </button>
-                  
-                  <button 
-                    className="note-editor-menu-item"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      onAddToTask(idea);
-                    }}
-                  >
-                    <span className="note-editor-menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 11l3 3L22 4"/>
-                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                      </svg>
-                    </span>
-                    <span>Добавить в Задачи</span>
-                  </button>
-                  
-                  <button 
-                    className="note-editor-menu-item"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      onAddToSchedule(idea);
-                    }}
-                  >
-                    <span className="note-editor-menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                        <line x1="16" y1="2" x2="16" y2="6"/>
-                        <line x1="8" y1="2" x2="8" y2="6"/>
-                        <line x1="3" y1="10" x2="21" y2="10"/>
-                      </svg>
-                    </span>
-                    <span>Добавить в Расписание</span>
-                  </button>
-                  
-                  <button 
-                    className="note-editor-menu-item danger"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      if (window.confirm('Удалить заметку?')) {
-                        onDelete(idea.id);
-                        navigate(-1);
-                      }
-                    }}
-                  >
-                    <span className="note-editor-menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                      </svg>
-                    </span>
-                    <span>Удалить</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Dropdown меню - выбор папки */}
-          {showFolderMenu && (
-            <>
-              <div className="note-editor-menu-overlay" onClick={() => {
-                setShowFolderMenu(false);
-                setShowMenu(false);
-              }} />
-              <div className="note-editor-menu-dropdown" onClick={(e) => e.stopPropagation()}>
-                <div className="note-editor-menu-content">
-                  <button 
-                    className="note-editor-menu-item"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setShowFolderMenu(false);
-                      setTimeout(() => {
-                        setShowMenu(true);
-                      }, 100);
-                    }}
-                  >
-                    <span className="note-editor-menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="15 18 9 12 15 6"/>
-                      </svg>
-                    </span>
-                    <span>Назад</span>
-                  </button>
-                  <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0' }} />
-                  <button 
-                    className="note-editor-menu-item"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onMoveToFolder(idea.id, null);
-                      setShowFolderMenu(false);
-                      setShowMenu(false);
-                    }}
-                  >
-                    <span className="note-editor-menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
-                        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
-                      </svg>
-                    </span>
-                    <span>Инбокс</span>
-                  </button>
-                  {folders.filter(f => f.id !== 'inbox').map(folder => (
-                    <button 
-                      key={folder.id}
-                      className="note-editor-menu-item"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        onMoveToFolder(idea.id, folder.id);
-                        setShowFolderMenu(false);
-                        setShowMenu(false);
-                      }}
-                    >
-                      <span 
-                        className="note-editor-menu-icon"
-                        style={{ color: folder.color, fontSize: '20px' }}
+          {/* Dropdown меню с анимацией слайда */}
+          {(showMenu || menuClosing) && (
+              <div 
+                className={`note-editor-menu-dropdown ${menuClosing ? 'closing' : ''}`} 
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`note-editor-menu-slider ${menuView === 'folders' ? 'show-folders' : ''} slide-${menuSlideDirection}`}>
+                  {/* Основное меню */}
+                  <div className="note-editor-menu-panel main-panel">
+                    <div className="note-editor-menu-content">
+                      <button 
+                        className="note-editor-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          goToFolders();
+                        }}
                       >
-                        {folder.icon}
-                      </span>
-                      <span>{folder.name}</span>
-                    </button>
-                  ))}
+                        <span className="note-editor-menu-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                          </svg>
+                        </span>
+                        <span>Переместить в папку</span>
+                        <svg className="note-editor-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                      </button>
+                      
+                      <button 
+                        className="note-editor-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeMenu();
+                          onTogglePin(idea.id);
+                        }}
+                      >
+                        <span className="note-editor-menu-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 17v5M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+                          </svg>
+                        </span>
+                        <span>{idea.isPinned ? 'Открепить' : 'Закрепить'}</span>
+                      </button>
+                      
+                      <button 
+                        className="note-editor-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeMenu();
+                          onAddToTask(idea);
+                        }}
+                      >
+                        <span className="note-editor-menu-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 11l3 3L22 4"/>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                          </svg>
+                        </span>
+                        <span>Добавить в Задачи</span>
+                      </button>
+                      
+                      <button 
+                        className="note-editor-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeMenu();
+                          onAddToSchedule(idea);
+                        }}
+                      >
+                        <span className="note-editor-menu-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                          </svg>
+                        </span>
+                        <span>Добавить в Расписание</span>
+                      </button>
+                      
+                      <button 
+                        className="note-editor-menu-item danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeMenu();
+                          if (window.confirm('Удалить заметку?')) {
+                            onDelete(idea.id);
+                            navigate(-1);
+                          }
+                        }}
+                      >
+                        <span className="note-editor-menu-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </span>
+                        <span>Удалить</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Меню выбора папки */}
+                  <div className="note-editor-menu-panel folders-panel">
+                    <div className="note-editor-menu-content">
+                      <button 
+                        className="note-editor-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          goToMainMenu();
+                        }}
+                      >
+                        <span className="note-editor-menu-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="15 18 9 12 15 6"/>
+                          </svg>
+                        </span>
+                        <span>Назад</span>
+                      </button>
+                      <div className="note-editor-menu-divider" />
+                      <button 
+                        className="note-editor-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          onMoveToFolder(idea.id, null);
+                          closeMenu();
+                        }}
+                      >
+                        <span className="note-editor-menu-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+                            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                          </svg>
+                        </span>
+                        <span>Инбокс</span>
+                      </button>
+                      {folders.filter(f => f.id !== 'inbox').map(folder => (
+                        <button 
+                          key={folder.id}
+                          className="note-editor-menu-item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onMoveToFolder(idea.id, folder.id);
+                            closeMenu();
+                          }}
+                        >
+                          <span 
+                            className="note-editor-menu-icon"
+                            style={{ color: folder.color, fontSize: '20px' }}
+                          >
+                            {folder.icon}
+                          </span>
+                          <span>{folder.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </>
           )}
         </div>
       </div>
@@ -750,14 +864,18 @@ export function NoteEditor({
         <div 
           className={`note-editor-canvas ${keyboardVisible ? 'keyboard-open' : ''}`}
           ref={editorRef}
+          onClick={handleCanvasClick}
         >
           <EditorContent editor={editor} />
-          {/* Дополнительный отступ внизу для возможности скроллить последнюю строку выше клавиатуры */}
+          {/* Дополнительный отступ внизу - клик на него переносит фокус в конец */}
           <div 
             className="note-editor-scroll-padding"
             style={{ 
-              height: keyboardVisible ? `${Math.max(keyboardHeight, 300)}px` : '200px',
-              pointerEvents: 'none'
+              height: keyboardVisible ? `${Math.max(keyboardHeight, 300)}px` : '200px'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              editor.commands.focus('end');
             }}
           />
         </div>

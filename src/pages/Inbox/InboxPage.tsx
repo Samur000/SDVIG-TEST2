@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
-import { EmptyState } from '../../components/UI';
+import { EmptyState, useToast } from '../../components/UI';
 import { useApp } from '../../store/AppContext';
 import { Idea, Folder } from '../../types';
 import { v4 as uuid } from 'uuid';
@@ -21,6 +21,7 @@ export function InboxPage() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const { id: noteId } = useParams<{ id?: string }>();
+  const { showToast } = useToast();
   
   // Находим текущую заметку для редактирования
   const currentNote = noteId ? state.ideas.find(i => i.id === noteId) : null;
@@ -176,6 +177,7 @@ export function InboxPage() {
     setSelectedFolderId(null);
     setInputFocused(false);
     setShowFolderSelect(false);
+    showToast('Заметка добавлена');
   };
 
   // Обработка свайпов
