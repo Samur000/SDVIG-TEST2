@@ -27,6 +27,15 @@
   --safe-bottom: env(safe-area-inset-bottom);
 }
 
+/* Keyboard-aware layout - фиксированная высота viewport */
+html, body, #root {
+  height: 100dvh;
+  height: 100svh; /* fallback для Safari */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
 /* Тёмная тема */
 [data-theme="dark"] {
   --bg: #111827;

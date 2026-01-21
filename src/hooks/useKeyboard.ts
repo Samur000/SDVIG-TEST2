@@ -5,7 +5,41 @@ export const useKeyboard = () => {
   const [height, setHeight] = useState(0);
 
   useEffect(() => {
+    // Устанавливаем CSS переменную --vh для динамической высоты viewport
+    const setVH = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+    setVH();
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      // Проверяем, что фокус в редакторе TipTap
+      if (target.closest('.ProseMirror')) {
+        setIsVisible(true);
+        // Даем время клавиатуре появиться
+        setTimeout(() => {
+          handleViewportResize();
+        }, 300);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.relatedTarget as HTMLElement;
+      // Не скрываем, если фокус переходит на панель форматирования
+      if (!target || !target.closest('.note-editor-format-bar, .note-editor-format-btn')) {
+        setTimeout(() => {
+          if (!document.activeElement?.closest('.ProseMirror')) {
+            setIsVisible(false);
+            setHeight(0);
+          }
+        }, 200);
+      }
+    };
+
     const handleViewportResize = () => {
+      setVH(); // Обновляем --vh при изменении viewport
+      
       if (window.visualViewport) {
         const viewportHeight = window.visualViewport.height;
         const windowHeight = window.innerHeight;
@@ -24,30 +58,6 @@ export const useKeyboard = () => {
         
         setHeight(calculatedHeight);
         setIsVisible(calculatedHeight > 150);
-      }
-    };
-
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      // Проверяем, что фокус в редакторе
-      if (target.closest('.ProseMirror')) {
-        setIsVisible(true);
-        // Даем время клавиатуре появиться
-        setTimeout(handleViewportResize, 300);
-      }
-    };
-
-    const handleFocusOut = (e: FocusEvent) => {
-      const target = e.relatedTarget as HTMLElement;
-      // Не скрываем, если фокус переходит на панель форматирования
-      if (!target || !target.closest('.note-editor-format-bar, .note-editor-format-btn')) {
-        // Небольшая задержка для проверки
-        setTimeout(() => {
-          if (!document.activeElement?.closest('.ProseMirror')) {
-            setIsVisible(false);
-            setHeight(0);
-          }
-        }, 200);
       }
     };
 

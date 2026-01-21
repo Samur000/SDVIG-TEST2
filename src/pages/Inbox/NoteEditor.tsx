@@ -56,41 +56,14 @@ export function NoteEditor({
     }
     
     if (idea.text) {
-      const trimmedText = idea.text.trim();
-      
-      // Проверяем, является ли это валидным HTML (не экранированным)
-      const isHtml = trimmedText.startsWith('<') && 
-                     !trimmedText.includes('&lt;') && 
-                     !trimmedText.includes('&gt;') &&
-                     (trimmedText.includes('</p>') || trimmedText.includes('</div>') || trimmedText.includes('</h'));
-      
-      if (isHtml) {
-        // Это валидный HTML - используем напрямую, убираем только <br> теги
-        html += trimmedText.replace(/<br\s*\/?>/gi, '\n');
+      // Проверяем, это уже HTML или обычный текст
+      if (idea.text.startsWith('<') || idea.text.includes('<br>') || idea.text.includes('<div>') || idea.text.includes('<p>')) {
+        html += idea.text;
       } else {
-        // Это может быть экранированный HTML или обычный текст
-        // Пробуем декодировать, если есть экранированные символы
-        let processedText = trimmedText;
-        
-        if (trimmedText.includes('&lt;') || trimmedText.includes('&gt;')) {
-          // Декодируем экранированный HTML
-          const tempDecode = document.createElement('div');
-          tempDecode.innerHTML = trimmedText;
-          processedText = tempDecode.textContent || trimmedText;
-          
-          // После декодирования проверяем, стал ли это HTML
-          if (processedText.trim().startsWith('<') && 
-              !processedText.includes('&lt;') && 
-              (processedText.includes('</p>') || processedText.includes('</div>'))) {
-            html += processedText.replace(/<br\s*\/?>/gi, '\n');
-            return html || '<p></p>';
-          }
-        }
-        
-        // Это обычный текст - конвертируем в параграфы
-        const paragraphs = processedText.replace(/<br\s*\/?>/gi, '\n').split('\n').filter(p => p.trim() || p === '');
+        // Конвертируем обычный текст в параграфы
+        const paragraphs = idea.text.split('\n').filter(p => p.trim() || p === '');
         if (paragraphs.length > 0) {
-          html += paragraphs.map(p => p.trim() ? `<p>${escapeHtml(p)}</p>` : '<p></p>').join('');
+          html += paragraphs.map(p => p.trim() ? `<p>${escapeHtml(p)}</p>` : '<p><br></p>').join('');
         }
       }
     }
@@ -451,7 +424,7 @@ export function NoteEditor({
           </svg>
         </button>
 
-        <span className="note-editor-version">СДВиГ 2.1.1</span>
+        
         
         <div style={{ position: 'relative' }}>
           <button 

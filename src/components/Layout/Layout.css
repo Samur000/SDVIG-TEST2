@@ -1,21 +1,24 @@
 .layout {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100dvh;
+  height: 100svh; /* fallback для Safari */
   max-width: 480px;
   margin: 0 auto;
   background: var(--bg);
-  padding-bottom: max(30px, var(--safe-bottom));
+  overflow: hidden;
 }
 
 .header {
-  position: sticky;
+  position: relative;
   top: 0;
   z-index: 100;
   background: var(--bg);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 16px 20px;
   min-height: var(--header-height);
+  flex-shrink: 0;
 }
 
 .header-content {
