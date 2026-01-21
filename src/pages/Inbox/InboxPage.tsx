@@ -52,6 +52,12 @@ export function InboxPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<Idea | null>(null);
   const [showDeleteFolderConfirm, setShowDeleteFolderConfirm] = useState<Folder | null>(null);
   
+  // Константы для управления свайпом
+  const SWIPE_MAX_OFFSET = 80; // Максимальное смещение при свайпе (px)
+  const SWIPE_THRESHOLD = 50; // Порог для фиксации позиции (px)
+  const SWIPE_TRANSITION_DURATION = '.5s'; // Длительность анимации возврата
+  const SWIPE_TRANSITION_EASING = 'ease-in-out'; // Тип анимации возврата
+
   // Состояние для свайпов
   const swipeStartX = useRef<number>(0);
   const swipeStartY = useRef<number>(0);
@@ -207,10 +213,9 @@ export function InboxPage() {
       swipeCurrentX.current = currentX;
       
       // Ограничиваем свайп (влево = отрицательное, вправо = положительное)
-      const maxSwipe = 80;
       setSwipeOffset({
         ...swipeOffset,
-        [swipingIdeaId.current]: Math.max(-maxSwipe, Math.min(maxSwipe, diffX))
+        [swipingIdeaId.current]: Math.max(-SWIPE_MAX_OFFSET, Math.min(SWIPE_MAX_OFFSET, diffX))
       });
     } else if (isHorizontalSwipe.current) {
       isHorizontalSwipe.current = false;
@@ -237,15 +242,14 @@ export function InboxPage() {
       }
     });
     
-    // Если свайпнули влево больше 50px - показываем кнопку удаления
-    // Если свайпнули вправо больше 50px - показываем кнопку закрепления
+    // Если свайпнули больше порога - показываем кнопку действия
     // Оставляем карточку в позиции если свайп был достаточно сильным
-    if (Math.abs(offset) < 50) {
+    if (Math.abs(offset) < SWIPE_THRESHOLD) {
       // Сброс позиции если свайп был слишком слабым
       updatedOffsets[ideaId] = 0;
     } else {
       // Фиксируем позицию
-      const targetOffset = offset < 0 ? -80 : 80;
+      const targetOffset = offset < 0 ? -SWIPE_MAX_OFFSET : SWIPE_MAX_OFFSET;
       updatedOffsets[ideaId] = targetOffset;
     }
     
@@ -779,7 +783,7 @@ export function InboxPage() {
                       return (
                         <div key={idea.id} className="inbox-note-item-wrapper">
                           {/* Кнопка удаления (справа, показывается при свайпе влево) */}
-                          {offset < -40 && (
+                          {offset < -SWIPE_THRESHOLD / 2 && (
                             <div className="inbox-swipe-action-btn delete" onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteClick(idea.id);
@@ -792,7 +796,7 @@ export function InboxPage() {
                           )}
 
                           {/* Кнопка закрепления (слева, показывается при свайпе вправо) */}
-                          {offset > 40 && (
+                          {offset > SWIPE_THRESHOLD / 2 && (
                             <div className="inbox-swipe-action-btn pin" onClick={(e) => {
                               e.stopPropagation();
                               handlePinClick(idea.id);
@@ -811,7 +815,9 @@ export function InboxPage() {
                             onClick={(e) => handleItemClick(idea.id, e)}
                             style={{
                               transform: `translateX(${offset}px)`,
-                              transition: swipingIdeaId.current === idea.id ? 'none' : 'transform 0.2s ease'
+                              transition: swipingIdeaId.current === idea.id 
+                                ? 'none' 
+                                : `transform ${SWIPE_TRANSITION_DURATION} ${SWIPE_TRANSITION_EASING}`
                             }}
                           >
                             <div
