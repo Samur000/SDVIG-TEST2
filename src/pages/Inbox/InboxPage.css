@@ -392,13 +392,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   transition: all 0.2s ease;
   z-index: 10;
-}
-
-.inbox-folder-chip-wrapper:hover .inbox-folder-edit-btn {
-  opacity: 1;
 }
 
 .inbox-folder-edit-btn:hover {

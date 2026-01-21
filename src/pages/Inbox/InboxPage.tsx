@@ -585,13 +585,26 @@ export function InboxPage() {
         <div className="inbox-folders-scroll">
           <div className="inbox-folders">
             {/* Инбокс */}
-            <button
-              className={`inbox-folder-chip ${activeFolderId === 'inbox' || activeFolderId === null ? 'active' : ''}`}
-              onClick={() => setActiveFolderId('inbox')}
-            >
-              <span className="inbox-folder-icon">📥</span>
-              <span className="inbox-folder-name">Инбокс</span>
-            </button>
+            <div className="inbox-folder-chip-wrapper">
+              <button
+                className={`inbox-folder-chip ${activeFolderId === 'inbox' || activeFolderId === null ? 'active' : ''}`}
+                onClick={() => setActiveFolderId('inbox')}
+              >
+                <span className="inbox-folder-icon">📥</span>
+                <span className="inbox-folder-name">Инбокс</span>
+              </button>
+              {(activeFolderId === 'inbox' || activeFolderId === null) && (
+                <button
+                  className="inbox-folder-edit-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Для инбокса не показываем редактирование, можно оставить пустым или скрыть
+                  }}
+                  title="Инбокс нельзя редактировать"
+                  style={{ opacity: 0, pointerEvents: 'none' }}
+                />
+              )}
+            </div>
             
             {/* Остальные папки */}
             {folders
@@ -609,19 +622,21 @@ export function InboxPage() {
                     <span className="inbox-folder-icon">{folder.icon}</span>
                     <span className="inbox-folder-name">{folder.name}</span>
                   </button>
-                  <button
-                    className="inbox-folder-edit-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingFolder(folder);
-                    }}
-                    title="Редактировать папку"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                  </button>
+                  {activeFolderId === folder.id && (
+                    <button
+                      className="inbox-folder-edit-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingFolder(folder);
+                      }}
+                      title="Редактировать папку"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </button>
+                  )}
                 </div>
               ))}
             
