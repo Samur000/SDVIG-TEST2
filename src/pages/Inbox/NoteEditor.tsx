@@ -149,46 +149,59 @@ export function NoteEditor({
     }
   });
 
-  // 📍 АВТОСКРОЛЛ КУРСОРА
-  const scrollToCursor = useCallback(() => {
+  // Отслеживание времени последнего ввода для определения скорости печати
+  const lastInputTime = useRef<number>(0);
+
+  // 📍 АВТОСКРОЛЛ КУРСОРА (как в iPhone Notes)
+  const scrollToCursor = useCallback((instant: boolean = false) => {
     if (!editorRef.current || !editor) return;
     
     try {
       const selection = editor.state.selection;
-      
-      // Получаем координаты курсора относительно viewport
       const view = editor.view;
       const coords = view.coordsAtPos(selection.from);
       
-      const containerRect = editorRef.current.getBoundingClientRect();
-      const containerTop = containerRect.top;
-      const containerHeight = containerRect.height;
+      const container = editorRef.current;
+      const containerRect = container.getBoundingClientRect();
       
-      // Координаты курсора относительно viewport
-      const cursorTop = coords.top;
-      const cursorBottom = coords.bottom;
+      // Видимая область над клавиатурой
+      const visibleHeight = keyboardVisible 
+        ? window.innerHeight - keyboardHeight - containerRect.top - 60 // 60px отступ для панели форматирования
+        : containerRect.height;
       
-      // Вычисляем позицию курсора относительно контейнера
-      const cursorRelativeTop = cursorTop - containerTop;
+      // Позиция курсора относительно верха контейнера (в viewport координатах)
+      const cursorY = coords.bottom - containerRect.top;
       
-      // Целевая позиция - 20% от верха контейнера
-      const targetPosition = containerHeight * 0.2;
+      // Безопасная зона - держим курсор в верхних 60% видимой области
+      const safeZone = visibleHeight * 0.6;
       
-      // Вычисляем нужный скролл
-      const scrollDelta = cursorRelativeTop - targetPosition;
+      // Определяем поведение скролла: instant при быстром вводе, smooth иначе
+      const now = Date.now();
+      const timeSinceLastInput = now - lastInputTime.current;
+      const behavior: ScrollBehavior = instant || timeSinceLastInput < 100 ? 'instant' : 'smooth';
+      lastInputTime.current = now;
       
-      // Проверяем, не находится ли курсор под клавиатурой
-      const visibleBottom = containerRect.bottom - keyboardHeight - 20; // 20px отступ от клавиатуры
+      // Если курсор ниже безопасной зоны - скроллим
+      if (cursorY > safeZone) {
+        const scrollAmount = cursorY - safeZone;
+        container.scrollTo({
+          top: container.scrollTop + scrollAmount,
+          behavior
+        });
+      }
       
-      if (scrollDelta < 0 || cursorBottom > visibleBottom) {
-        // Скроллим контейнер
-        editorRef.current.scrollTop += scrollDelta;
+      // Если курсор выше видимой области (пользователь скроллит вверх)
+      if (cursorY < 0) {
+        container.scrollTo({
+          top: container.scrollTop + cursorY - 20,
+          behavior
+        });
       }
     } catch (error) {
       // Игнорируем ошибки, если курсор еще не готов
       console.debug('Scroll to cursor error:', error);
     }
-  }, [editor, keyboardHeight]);
+  }, [editor, keyboardHeight, keyboardVisible]);
 
   // Автоматический фокус на редактор при открытии заметки
   // Автофокус на заголовок для новых заметок
@@ -209,6 +222,17 @@ export function NoteEditor({
     }
   }, [editor, idea.id, scrollToCursor]); // Используем idea.id чтобы срабатывало при открытии новой заметки
 
+  // Автоскролл при появлении/изменении клавиатуры
+  useEffect(() => {
+    if (keyboardVisible && editor) {
+      // Когда клавиатура появляется, скроллим к курсору с задержкой
+      const timeoutId = setTimeout(() => {
+        scrollToCursor();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [keyboardVisible, keyboardHeight, editor, scrollToCursor]);
+
   // Автоскролл при изменении позиции курсора
   useEffect(() => {
     if (!editor) return;
@@ -220,23 +244,37 @@ export function NoteEditor({
     return () => clearTimeout(timeoutId);
   }, [editor?.state.selection?.from, keyboardHeight, scrollToCursor]);
 
-  // Автоскролл при нажатии Enter (новая строка)
+  // Автоскролл при каждом нажатии клавиши (как в iPhone Notes)
   useEffect(() => {
     if (!editor || !editorRef.current) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        setTimeout(() => {
-          scrollToCursor();
-        }, 10);
+      // Скроллим при любом вводе текста или Enter
+      if (e.key === 'Enter' || e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+        // Небольшая задержка чтобы DOM обновился
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            // Используем instant для мгновенного скролла при вводе
+            scrollToCursor(true);
+          }, 5);
+        });
       }
+    };
+
+    // Также скроллим при изменении контента
+    const handleInput = () => {
+      requestAnimationFrame(() => {
+        scrollToCursor(true);
+      });
     };
 
     const proseMirror = editorRef.current.querySelector('.ProseMirror') as HTMLElement;
     if (proseMirror) {
       proseMirror.addEventListener('keydown', handleKeyDown);
+      proseMirror.addEventListener('input', handleInput);
       return () => {
         proseMirror.removeEventListener('keydown', handleKeyDown);
+        proseMirror.removeEventListener('input', handleInput);
       };
     }
   }, [editor, scrollToCursor]);
@@ -701,16 +739,27 @@ export function NoteEditor({
       </div>
 
       {/* Контейнер контента - ключевое для правильного скролла */}
-      <div className="note-editor-content-wrapper">
+      <div 
+        className="note-editor-content-wrapper"
+        style={{
+          // Уменьшаем высоту wrapper когда клавиатура открыта
+          paddingBottom: keyboardVisible ? `${keyboardHeight + 60}px` : '0px'
+        }}
+      >
         {/* Рабочая область - скролл ТОЛЬКО здесь */}
         <div 
-          className="note-editor-canvas"
+          className={`note-editor-canvas ${keyboardVisible ? 'keyboard-open' : ''}`}
           ref={editorRef}
-          style={{
-            minHeight: keyboardVisible ? 'calc(100vh + 70vh)' : '100vh'
-          }}
         >
           <EditorContent editor={editor} />
+          {/* Дополнительный отступ внизу для возможности скроллить последнюю строку выше клавиатуры */}
+          <div 
+            className="note-editor-scroll-padding"
+            style={{ 
+              height: keyboardVisible ? `${Math.max(keyboardHeight, 300)}px` : '200px',
+              pointerEvents: 'none'
+            }}
+          />
         </div>
       </div>
 

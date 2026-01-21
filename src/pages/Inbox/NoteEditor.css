@@ -93,26 +93,43 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+  transition: padding-bottom 0.25s ease-out;
 }
 
 /* Рабочая область - скролл ТОЛЬКО здесь */
 .note-editor-canvas {
   flex: 1;
   padding: 24px 20px;
+  padding-bottom: 50px;
   background: var(--bg-primary);
   cursor: text;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0; /* критично для flex child */
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
-  scroll-behavior: smooth; /* Плавный скролл */
+  scroll-behavior: smooth; /* Плавный скролл как в iPhone */
+}
+
+/* Когда клавиатура открыта */
+.note-editor-canvas.keyboard-open {
+  /* Отключаем плавный скролл при вводе для более отзывчивого поведения */
+  scroll-behavior: auto;
 }
 
 .note-editor-canvas::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
+}
+
+/* Отступ для скролла - позволяет скроллить последнюю строку выше клавиатуры */
+.note-editor-scroll-padding {
+  flex-shrink: 0;
+  width: 100%;
+  transition: height 0.25s ease-out;
 }
 
 /* TipTap редактор */
@@ -121,13 +138,26 @@
   min-height: 100%;
   color: var(--text-primary);
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.7;
   font-family: inherit;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
-/* Курсор всегда виден */
+/* Курсор всегда виден - стиль iPhone */
 .ProseMirror-focused {
   caret-color: #007AFF;
+}
+
+/* Улучшенное выделение текста */
+.ProseMirror ::selection {
+  background: rgba(0, 122, 255, 0.2);
+}
+
+/* Анимация курсора как в iOS */
+.ProseMirror-gapcursor:after {
+  border-color: #007AFF;
 }
 
 .ProseMirror p {
@@ -383,9 +413,9 @@
   right: 0;
   height: 44px;
   background: var(--bg-secondary);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   z-index: 999;
@@ -394,8 +424,9 @@
   overflow: hidden;
   pointer-events: auto;
   transform: translateY(100%);
-  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+              bottom 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
 }
 
 .note-editor-format-bar.show {
