@@ -140,7 +140,7 @@
 /* Рабочая область - скролл ТОЛЬКО здесь */
 .note-editor-canvas {
   flex: 1;
-  padding: 24px 20px;
+  padding: 4px 20px 24px;
   padding-bottom: 50px;
   background: var(--bg-primary);
   cursor: text;
