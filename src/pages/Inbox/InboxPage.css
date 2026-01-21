@@ -91,10 +91,16 @@
   z-index: 1;
   touch-action: pan-y pinch-zoom;
   will-change: transform;
+  transition: transform 0.1s ease-out;
 }
 
 .inbox-note-item.pinned {
   background: var(--bg-secondary);
+}
+
+/* Блокировка вертикального скролла при активном свайпе */
+.inbox-note-item.swipe-active {
+  touch-action: pan-x !important;
 }
 
 .inbox-note-item-content {

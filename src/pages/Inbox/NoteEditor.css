@@ -108,6 +108,7 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
+  scroll-behavior: smooth; /* Плавный скролл */
 }
 
 .note-editor-canvas::-webkit-scrollbar {
@@ -122,6 +123,11 @@
   font-size: 16px;
   line-height: 1.6;
   font-family: inherit;
+}
+
+/* Курсор всегда виден */
+.ProseMirror-focused {
+  caret-color: #007AFF;
 }
 
 .ProseMirror p {

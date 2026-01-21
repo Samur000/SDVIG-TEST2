@@ -65,6 +65,7 @@ export function InboxPage() {
   const swipingIdeaId = useRef<string | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
   const isHorizontalSwipe = useRef<boolean>(false);
+  const [swipeActiveId, setSwipeActiveId] = useState<string | null>(null); // ID активной свайп-карточки для CSS класса
 
   // Получаем папки, сортируем по order
   const folders = useMemo(() => {
@@ -203,24 +204,39 @@ export function InboxPage() {
     const diffY = Math.abs(currentY - swipeStartY.current);
     const absDiffX = Math.abs(diffX);
     
-    // Если горизонтальное движение больше вертикального и больше порога - это горизонтальный свайп
-    if (absDiffX > diffY && absDiffX > 10) {
-      // Определяем что это горизонтальный свайп и блокируем вертикальный скролл
-      if (!isHorizontalSwipe.current) {
-        isHorizontalSwipe.current = true;
+    // 📏 ПОРОГ РЕШЕНИЯ: 10px
+    // Если движение превысило порог - принимаем решение
+    if (absDiffX > 10 || diffY > 10) {
+      // 🎯 РЕШЕНИЕ ПРИНЯТО — идем до конца одним путем
+      
+      if (absDiffX > diffY) {
+        // Горизонталь победила → СВАЙП
+        if (!isHorizontalSwipe.current) {
+          isHorizontalSwipe.current = true;
+          setSwipeActiveId(swipingIdeaId.current); // Активируем CSS класс для блокировки скролла
+        }
+        
+        swipeCurrentX.current = currentX;
+        
+        // Ограничиваем свайп (влево = отрицательное, вправо = положительное)
+        setSwipeOffset({
+          ...swipeOffset,
+          [swipingIdeaId.current]: Math.max(-SWIPE_MAX_OFFSET, Math.min(SWIPE_MAX_OFFSET, diffX))
+        });
+      } else {
+        // Вертикаль победила → СКРОЛЛ (отменяем свайп)
+        if (isHorizontalSwipe.current) {
+          isHorizontalSwipe.current = false;
+          setSwipeActiveId(null); // Убираем CSS класс, разрешаем скролл
+          // Сбрасываем позицию свайпа
+          setSwipeOffset({
+            ...swipeOffset,
+            [swipingIdeaId.current]: 0
+          });
+        }
       }
-      
-      swipeCurrentX.current = currentX;
-      
-      // Ограничиваем свайп (влево = отрицательное, вправо = положительное)
-      setSwipeOffset({
-        ...swipeOffset,
-        [swipingIdeaId.current]: Math.max(-SWIPE_MAX_OFFSET, Math.min(SWIPE_MAX_OFFSET, diffX))
-      });
-    } else if (isHorizontalSwipe.current) {
-      isHorizontalSwipe.current = false;
     }
-    // Если это вертикальный жест - ничего не делаем, позволяем скроллить
+    // Если движение меньше порога - ничего не делаем, ждем решения
   };
 
   const handleTouchEnd = (ideaId: string, e?: React.TouchEvent) => {
@@ -256,6 +272,7 @@ export function InboxPage() {
     setSwipeOffset(updatedOffsets);
     swipingIdeaId.current = null;
     isHorizontalSwipe.current = false; // Сбрасываем флаг
+    setSwipeActiveId(null); // Сбрасываем активный класс для разблокировки скролла
   };
 
   // Обработка клика на кнопку удаления (при свайпе влево)
@@ -808,7 +825,7 @@ export function InboxPage() {
                           )}
 
                           <div
-                            className={`inbox-note-item ${idea.isPinned ? 'pinned' : ''}`}
+                            className={`inbox-note-item ${idea.isPinned ? 'pinned' : ''} ${swipeActiveId === idea.id ? 'swipe-active' : ''}`}
                             onTouchStart={(e) => handleTouchStart(idea.id, e)}
                             onTouchMove={handleTouchMove}
                             onTouchEnd={(e) => handleTouchEnd(idea.id, e)}

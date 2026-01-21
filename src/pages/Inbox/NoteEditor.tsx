@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -149,6 +149,47 @@ export function NoteEditor({
     }
   });
 
+  // 📍 АВТОСКРОЛЛ КУРСОРА
+  const scrollToCursor = useCallback(() => {
+    if (!editorRef.current || !editor) return;
+    
+    try {
+      const selection = editor.state.selection;
+      
+      // Получаем координаты курсора относительно viewport
+      const view = editor.view;
+      const coords = view.coordsAtPos(selection.from);
+      
+      const containerRect = editorRef.current.getBoundingClientRect();
+      const containerTop = containerRect.top;
+      const containerHeight = containerRect.height;
+      
+      // Координаты курсора относительно viewport
+      const cursorTop = coords.top;
+      const cursorBottom = coords.bottom;
+      
+      // Вычисляем позицию курсора относительно контейнера
+      const cursorRelativeTop = cursorTop - containerTop;
+      
+      // Целевая позиция - 20% от верха контейнера
+      const targetPosition = containerHeight * 0.2;
+      
+      // Вычисляем нужный скролл
+      const scrollDelta = cursorRelativeTop - targetPosition;
+      
+      // Проверяем, не находится ли курсор под клавиатурой
+      const visibleBottom = containerRect.bottom - keyboardHeight - 20; // 20px отступ от клавиатуры
+      
+      if (scrollDelta < 0 || cursorBottom > visibleBottom) {
+        // Скроллим контейнер
+        editorRef.current.scrollTop += scrollDelta;
+      }
+    } catch (error) {
+      // Игнорируем ошибки, если курсор еще не готов
+      console.debug('Scroll to cursor error:', error);
+    }
+  }, [editor, keyboardHeight]);
+
   // Автоматический фокус на редактор при открытии заметки
   // Автофокус на заголовок для новых заметок
   useEffect(() => {
@@ -160,12 +201,45 @@ export function NoteEditor({
         // Дополнительная попытка через небольшую задержку для надежности
         setTimeout(() => {
           editor.commands.focus('start');
+          scrollToCursor();
         }, 300);
       }, 200);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [editor, idea.id]); // Используем idea.id чтобы срабатывало при открытии новой заметки
+  }, [editor, idea.id, scrollToCursor]); // Используем idea.id чтобы срабатывало при открытии новой заметки
+
+  // Автоскролл при изменении позиции курсора
+  useEffect(() => {
+    if (!editor) return;
+    
+    const timeoutId = setTimeout(() => {
+      scrollToCursor();
+    }, 50);
+    
+    return () => clearTimeout(timeoutId);
+  }, [editor?.state.selection?.from, keyboardHeight, scrollToCursor]);
+
+  // Автоскролл при нажатии Enter (новая строка)
+  useEffect(() => {
+    if (!editor || !editorRef.current) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        setTimeout(() => {
+          scrollToCursor();
+        }, 10);
+      }
+    };
+
+    const proseMirror = editorRef.current.querySelector('.ProseMirror') as HTMLElement;
+    if (proseMirror) {
+      proseMirror.addEventListener('keydown', handleKeyDown);
+      return () => {
+        proseMirror.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [editor, scrollToCursor]);
 
   // Обработка пробела для завершения ссылки
   useEffect(() => {
@@ -632,6 +706,9 @@ export function NoteEditor({
         <div 
           className="note-editor-canvas"
           ref={editorRef}
+          style={{
+            minHeight: keyboardVisible ? 'calc(100vh + 70vh)' : '100vh'
+          }}
         >
           <EditorContent editor={editor} />
         </div>
