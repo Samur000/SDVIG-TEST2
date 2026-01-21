@@ -182,25 +182,44 @@ export function InboxPage() {
     swipeStartX.current = e.touches[0].clientX;
     swipeCurrentX.current = e.touches[0].clientX;
     swipingIdeaId.current = ideaId;
+    
+    // Сохраняем начальную позицию Y для определения направления свайпа
+    const startY = e.touches[0].clientY;
+    (e.currentTarget as HTMLElement).setAttribute('data-start-y', startY.toString());
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (swipingIdeaId.current === null) return;
-    swipeCurrentX.current = e.touches[0].clientX;
-    const diff = swipeCurrentX.current - swipeStartX.current;
+    
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    swipeCurrentX.current = currentX;
+    
+    const diffX = swipeCurrentX.current - swipeStartX.current;
+    const target = e.currentTarget as HTMLElement;
+    const startY = parseFloat(target.getAttribute('data-start-y') || '0');
+    const diffY = currentY - startY;
+    
+    // Если горизонтальный свайп больше вертикального, предотвращаем вертикальный скролл
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 5) {
+      e.preventDefault();
+    }
     
     // Ограничиваем свайп (влево = отрицательное, вправо = положительное)
     const maxSwipe = 80;
     setSwipeOffset({
       ...swipeOffset,
-      [swipingIdeaId.current]: Math.max(-maxSwipe, Math.min(maxSwipe, diff))
+      [swipingIdeaId.current]: Math.max(-maxSwipe, Math.min(maxSwipe, diffX))
     });
   };
 
-  const handleTouchEnd = (ideaId: string) => {
+  const handleTouchEnd = (ideaId: string, e: React.TouchEvent) => {
     if (swipingIdeaId.current !== ideaId) return;
     
     const offset = swipeOffset[ideaId] || 0;
+    
+    // Удаляем атрибут start-y
+    (e.currentTarget as HTMLElement).removeAttribute('data-start-y');
     
     // Сбрасываем все другие свайпнутые элементы
     const updatedOffsets: Record<string, number> = {};
@@ -749,7 +768,7 @@ export function InboxPage() {
                       const titleDisplay = title.length > 60 ? title.substring(0, 60) + '...' : title;
 
                       return (
-                        <div key={idea.id} className="inbox-note-item-wrapper">
+                        <div key={idea.id} className="inbox-note-item-wrapper" data-idea-id={idea.id}>
                           {/* Кнопка удаления (справа, показывается при свайпе влево) */}
                           {offset < -40 && (
                             <div className="inbox-swipe-action-btn delete" onClick={(e) => {
@@ -779,7 +798,7 @@ export function InboxPage() {
                             className={`inbox-note-item ${idea.isPinned ? 'pinned' : ''}`}
                             onTouchStart={(e) => handleTouchStart(idea.id, e)}
                             onTouchMove={handleTouchMove}
-                            onTouchEnd={() => handleTouchEnd(idea.id)}
+                            onTouchEnd={(e) => handleTouchEnd(idea.id, e)}
                             onClick={(e) => handleItemClick(idea.id, e)}
                             style={{
                               transform: `translateX(${offset}px)`,

@@ -22,6 +22,15 @@
   background: var(--bg-primary);
   min-height: 56px;
   position: relative;
+  gap: 12px;
+}
+
+.note-editor-version {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-tertiary);
+  font-style: italic;
 }
 
 .note-editor-back {
@@ -349,20 +358,27 @@
 /* Панель форматирования */
 .note-editor-format-bar {
   position: fixed;
-  bottom: calc(var(--nav-height) + 12px + var(--safe-area-bottom, 0px));
   left: 0;
   right: 0;
   height: 44px;
   background: var(--bg-secondary);
+  backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  z-index: 998;
+  z-index: 999;
   max-width: 480px;
   margin: 0 auto;
   overflow: hidden;
   pointer-events: auto;
+  transform: translateY(100%);
+  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.note-editor-format-bar.show {
+  transform: translateY(0);
 }
 
 .note-editor-format-scroll {
