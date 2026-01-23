@@ -28,6 +28,12 @@ export function TasksPage() {
   const taskFormRef = useRef<TaskFormHandle>(null);
   const [taskFormHasChanges, setTaskFormHasChanges] = useState(false);
   
+  // Состояния для свайпа
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const isInitialMount = useRef(true);
+  
   const today = getToday();
   
   const toggleSubtasks = (taskId: string) => {
@@ -40,6 +46,55 @@ export function TasksPage() {
       }
       return newSet;
     });
+  };
+
+  // Функция переключения вкладки с анимацией
+  const switchTab = (newTab: TabType, direction: 'left' | 'right') => {
+    if (newTab === activeTab) return;
+    
+    // Пропускаем анимацию при первом монтировании
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      setActiveTab(newTab);
+      return;
+    }
+    
+    setSlideDirection(direction);
+    setActiveTab(newTab);
+    // Сбрасываем направление после анимации
+    setTimeout(() => setSlideDirection(null), 350);
+  };
+
+  // Обработчики свайпа для переключения между todo и habits
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchEndX - touchStartX.current;
+    const diffY = touchEndY - touchStartY.current;
+    
+    // Проверяем, что это горизонтальный свайп (не вертикальный скролл)
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      // Свайп влево - переключаем на habits (если сейчас todo)
+      if (diffX < 0 && activeTab === 'todo') {
+        switchTab('habits', 'left');
+      }
+      // Свайп вправо - переключаем на todo (если сейчас habits)
+      else if (diffX > 0 && activeTab === 'habits') {
+        switchTab('todo', 'right');
+      }
+    }
+  };
+
+  // Обработчик клика по вкладкам с анимацией
+  const handleTabClick = (tab: TabType) => {
+    if (tab === activeTab) return;
+    const direction = tab === 'habits' ? 'left' : 'right';
+    switchTab(tab, direction);
   };
   
   // Форматирование даты создания задачи
@@ -345,20 +400,26 @@ export function TasksPage() {
       <div className="tabs">
         <button 
           className={`tab ${activeTab === 'todo' ? 'active' : ''}`}
-          onClick={() => setActiveTab('todo')}
+          onClick={() => handleTabClick('todo')}
         >
           To-Do
         </button>
         <button 
           className={`tab ${activeTab === 'habits' ? 'active' : ''}`}
-          onClick={() => setActiveTab('habits')}
+          onClick={() => handleTabClick('habits')}
         >
           Привычки
         </button>
       </div>
       
-      {activeTab === 'todo' ? (
-        <div className="todo-content">
+      {/* Контейнер с поддержкой свайпа */}
+      <div 
+        className="tasks-content-wrapper"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {activeTab === 'todo' ? (
+          <div className={`todo-content ${slideDirection === 'right' ? 'tasks-content-slide slide-right' : slideDirection === 'left' ? 'tasks-content-slide slide-left' : ''}`}>
           <button 
             className="add-item-btn"
             onClick={() => setShowTaskForm(true)}
@@ -439,9 +500,9 @@ export function TasksPage() {
               )}
             </>
           )}
-        </div>
-      ) : (
-        <div className="habits-content">
+          </div>
+        ) : (
+          <div className={`habits-content ${slideDirection === 'left' ? 'tasks-content-slide slide-left' : slideDirection === 'right' ? 'tasks-content-slide slide-right' : ''}`}>
           <button 
             className="add-item-btn"
             onClick={() => { setEditingHabit(null); setShowHabitModal(true); }}
@@ -478,8 +539,9 @@ export function TasksPage() {
               ))}
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
       
       {/* Модалки */}
       <Modal 

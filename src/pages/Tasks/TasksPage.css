@@ -186,6 +186,60 @@
   font-size: 14px;
 }
 
+/* Контейнер с поддержкой свайпа */
+.tasks-content-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+/* Базовые стили контента */
+.todo-content,
+.habits-content {
+  opacity: 1;
+  transform: translateX(0);
+  will-change: transform, opacity;
+}
+
+/* Анимация переключения контента - применяется только при наличии класса направления */
+.tasks-content-slide.slide-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.tasks-content-slide.slide-right {
+  animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0.8;
+    transform: translateX(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0.8;
+    transform: translateX(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Todo content */
+.todo-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /* Habits content */
 .habits-content {
   display: flex;
