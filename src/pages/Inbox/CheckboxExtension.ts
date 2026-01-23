@@ -44,7 +44,6 @@ export const Checkbox = Node.create<CheckboxOptions>({
           class: 'note-checkbox-icon',
           contenteditable: 'false',
           'data-checkbox-icon': 'true',
-          tabindex: '-1',
         },
       ],
       [
