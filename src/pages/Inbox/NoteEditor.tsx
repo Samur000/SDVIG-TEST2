@@ -2,8 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
 import { TextSelection } from 'prosemirror-state';
 import { Idea, Folder } from '../../types';
 import { Navigation } from '../../components/Layout/Navigation';
