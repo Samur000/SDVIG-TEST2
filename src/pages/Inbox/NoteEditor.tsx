@@ -201,25 +201,24 @@ export function NoteEditor({
         },
         paragraph: {
           HTMLAttributes: { class: 'note-editor-paragraph' }
-        }
+        },
+        // ✅ ОТКЛЮЧАЕМ дубликаты из StarterKit
+        link: false,        // StarterKit уже содержит
+        underline: false    // StarterKit уже содержит
       }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { class: 'note-editor-link' }
-      }),
+      // ✅ УДАЛИ эти строки:
+      // Underline,
+      // Link.configure({...}),
       Checkbox
     ],
     content: convertToHtml(idea),
     editorProps: {
       attributes: {
-        'data-placeholder': '' // Убираем placeholder текст
+        'data-placeholder': ''
       }
     },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
-
-      // Сохраняем заметку, даже если она пустая (удаление происходит только при нажатии "Назад")
       const { title, text } = extractTitleAndText(html);
       const updatedIdea: Idea = {
         ...idea,
@@ -423,21 +422,21 @@ export function NoteEditor({
   }, [editor]);
 
   // Обработка кликов на чекбоксы (только по иконке)
+  // Используем mousedown чтобы предотвратить фокус на редактор
   useEffect(() => {
     if (!editor || !editorRef.current) return;
 
-    const handleClick = (e: Event) => {
+    const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       
       // Переключаем только если клик именно на иконке чекбокса
       const checkboxIcon = target.closest('.note-checkbox-icon');
       if (!checkboxIcon) return;
       
-      // Проверяем, что клик был именно на самой иконке, а не на родительском элементе
-      if (target !== checkboxIcon && !checkboxIcon.contains(target)) return;
-      
+      // Блокируем событие полностью чтобы не было фокуса
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
       
       // Находим чекбокс-контейнер
       const checkbox = checkboxIcon.closest('[data-type="checkbox"]') as HTMLElement;
@@ -463,16 +462,31 @@ export function NoteEditor({
         if (node && node.type.name === 'checkbox') {
           const checked = !node.attrs.checked;
           tr.setNodeMarkup(checkboxPos, undefined, { checked });
-          editor.view.dispatch(tr);
+          // Dispatch без фокуса - просто обновляем состояние
+          view.dispatch(tr);
         }
+      }
+    };
+
+    // Блокируем click чтобы не было перехода фокуса после mousedown
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const checkboxIcon = target.closest('.note-checkbox-icon');
+      if (checkboxIcon) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
       }
     };
 
     const editorElement = editorRef.current.querySelector('.ProseMirror');
     if (editorElement) {
-      editorElement.addEventListener('click', handleClick as EventListener);
+      // Используем capture phase для раннего перехвата
+      editorElement.addEventListener('mousedown', handleMouseDown as EventListener, true);
+      editorElement.addEventListener('click', handleClick as EventListener, true);
       return () => {
-        editorElement.removeEventListener('click', handleClick as EventListener);
+        editorElement.removeEventListener('mousedown', handleMouseDown as EventListener, true);
+        editorElement.removeEventListener('click', handleClick as EventListener, true);
       };
     }
   }, [editor]);
@@ -510,15 +524,46 @@ export function NoteEditor({
     navigate(-1);
   };
 
-  // Форматирование текста
+  // Форматирование текста с сохранением marks для продолжения набора
   const formatText = (command: string) => {
     if (!editor) return;
     
+    // Для inline форматирования (bold, italic и т.д.) используем storedMarks
+    // чтобы форматирование сохранялось при продолжении набора текста
+    const toggleMarkWithStore = (markName: string, toggleFn: () => void) => {
+      const { state } = editor;
+      const { from, to } = state.selection;
+      
+      // Выполняем toggle
+      toggleFn();
+      
+      // Если нет выделения (курсор), управляем storedMarks
+      if (from === to) {
+        const markType = state.schema.marks[markName];
+        if (markType) {
+          // После toggle проверяем новое состояние
+          setTimeout(() => {
+            const newIsActive = editor.isActive(markName);
+            if (newIsActive) {
+              // Если mark активен, добавляем его в storedMarks
+              const currentMarks = editor.state.storedMarks || editor.state.selection.$from.marks();
+              const hasThisMark = currentMarks.some(m => m.type.name === markName);
+              if (!hasThisMark) {
+                const newMark = markType.create();
+                const newMarks = [...currentMarks, newMark];
+                editor.view.dispatch(editor.state.tr.setStoredMarks(newMarks));
+              }
+            }
+          }, 0);
+        }
+      }
+    };
+    
     const commands: Record<string, () => void> = {
-      toggleBold: () => editor.chain().focus().toggleBold().run(),
-      toggleItalic: () => editor.chain().focus().toggleItalic().run(),
-      toggleUnderline: () => editor.chain().focus().toggleUnderline().run(),
-      toggleStrike: () => editor.chain().focus().toggleStrike().run(),
+      toggleBold: () => toggleMarkWithStore('bold', () => editor.chain().focus().toggleBold().run()),
+      toggleItalic: () => toggleMarkWithStore('italic', () => editor.chain().focus().toggleItalic().run()),
+      toggleUnderline: () => toggleMarkWithStore('underline', () => editor.chain().focus().toggleUnderline().run()),
+      toggleStrike: () => toggleMarkWithStore('strike', () => editor.chain().focus().toggleStrike().run()),
       toggleBulletList: () => editor.chain().focus().toggleBulletList().run(),
       toggleOrderedList: () => editor.chain().focus().toggleOrderedList().run(),
       toggleHeading1: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
