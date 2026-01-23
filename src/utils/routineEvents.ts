@@ -15,15 +15,16 @@ function parseTime(timeStr: string, durationMinutes: number = 60): { startHour: 
     return { startHour, startMinute, endHour, endMinute };
   } else {
     // Одно время "09:00" - используем длительность
-    const [hour, minute] = timeStr.split(':').map(Number);
-    const endTime = new Date();
-    endTime.setHours(hour, minute, 0, 0);
-    endTime.setMinutes(endTime.getMinutes() + durationMinutes);
+    // Вычисляем время окончания математически (без зависимости от текущей даты)
+    const [startHour, startMinute] = timeStr.split(':').map(Number);
+    const totalEndMinutes = startHour * 60 + startMinute + durationMinutes;
+    const endHour = Math.floor(totalEndMinutes / 60) % 24;
+    const endMinute = totalEndMinutes % 60;
     return { 
-      startHour: hour, 
-      startMinute: minute, 
-      endHour: endTime.getHours(), 
-      endMinute: endTime.getMinutes() 
+      startHour, 
+      startMinute, 
+      endHour, 
+      endMinute 
     };
   }
 }
@@ -56,11 +57,10 @@ export function generateEventsFromRoutine(
     endMinute = time.endMinute;
   } else {
     // Если время не указано, используем дефолтное время (9:00) и длительность
-    const defaultEndTime = new Date();
-    defaultEndTime.setHours(9, 0, 0, 0);
-    defaultEndTime.setMinutes(defaultEndTime.getMinutes() + durationMinutes);
-    endHour = defaultEndTime.getHours();
-    endMinute = defaultEndTime.getMinutes();
+    // Вычисляем время окончания математически
+    const totalEndMinutes = 9 * 60 + 0 + durationMinutes;
+    endHour = Math.floor(totalEndMinutes / 60) % 24;
+    endMinute = totalEndMinutes % 60;
   }
   
   // Создаем Set существующих дат событий для этой рутины, чтобы не дублировать
@@ -95,12 +95,13 @@ export function generateEventsFromRoutine(
     
     // Проверяем, должен ли быть событие в этот день недели
     if (routine.days.includes(dayOfWeek) && !existingDates.has(dateStr)) {
-      // Создаем событие
-      const startTime = new Date(current);
-      startTime.setHours(startHour, startMinute, 0, 0);
+      // Создаем событие - используем явное создание через конструктор Date
+      const year = current.getFullYear();
+      const month = current.getMonth();
+      const day = current.getDate();
       
-      const endTime = new Date(current);
-      endTime.setHours(endHour, endMinute, 0, 0);
+      const startTime = new Date(year, month, day, startHour, startMinute, 0, 0);
+      const endTime = new Date(year, month, day, endHour, endMinute, 0, 0);
       
       // Если endTime меньше startTime (переход через полночь), добавляем день
       if (endTime < startTime) {

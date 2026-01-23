@@ -116,6 +116,7 @@ function formatLocalDate(date: Date): string {
 }
 
 // Парсинг времени из строки рутины
+// Вычисляем время окончания математически (без зависимости от текущей даты)
 function parseRoutineTime(timeStr: string, durationMinutes: number = 60): { startHour: number; startMinute: number; endHour: number; endMinute: number } {
   if (timeStr.includes('-')) {
     const [start, end] = timeStr.split('-').map(t => t.trim());
@@ -123,15 +124,15 @@ function parseRoutineTime(timeStr: string, durationMinutes: number = 60): { star
     const [endHour, endMinute] = end.split(':').map(Number);
     return { startHour, startMinute, endHour, endMinute };
   } else {
-    const [hour, minute] = timeStr.split(':').map(Number);
-    const endTime = new Date();
-    endTime.setHours(hour, minute, 0, 0);
-    endTime.setMinutes(endTime.getMinutes() + durationMinutes);
+    const [startHour, startMinute] = timeStr.split(':').map(Number);
+    const totalEndMinutes = startHour * 60 + startMinute + durationMinutes;
+    const endHour = Math.floor(totalEndMinutes / 60) % 24;
+    const endMinute = totalEndMinutes % 60;
     return { 
-      startHour: hour, 
-      startMinute: minute, 
-      endHour: endTime.getHours(), 
-      endMinute: endTime.getMinutes() 
+      startHour, 
+      startMinute, 
+      endHour, 
+      endMinute 
     };
   }
 }
@@ -149,7 +150,7 @@ function generatePastEventsFromRoutine(routine: Routine): Event[] {
   
   // Парсим время рутины
   const durationMinutes = routine.duration && routine.duration >= 10 ? routine.duration : 60;
-  let startHour = 9, startMinute = 0, endHour = 10, endMinute = 0;
+  let startHour = 9, startMinute = 0, endHour: number, endMinute: number;
   
   if (routine.time) {
     const time = parseRoutineTime(routine.time, durationMinutes);
@@ -157,6 +158,11 @@ function generatePastEventsFromRoutine(routine: Routine): Event[] {
     startMinute = time.startMinute;
     endHour = time.endHour;
     endMinute = time.endMinute;
+  } else {
+    // Вычисляем дефолтное время окончания на основе длительности
+    const totalEndMinutes = 9 * 60 + 0 + durationMinutes;
+    endHour = Math.floor(totalEndMinutes / 60) % 24;
+    endMinute = totalEndMinutes % 60;
   }
   
   // Создаем события для всех прошедших выполненных дат
@@ -167,11 +173,13 @@ function generatePastEventsFromRoutine(routine: Routine): Event[] {
     // Пропускаем будущие даты
     if (eventDate >= today) continue;
     
-    const startTime = new Date(eventDate);
-    startTime.setHours(startHour, startMinute, 0, 0);
+    // Используем явное создание через конструктор Date
+    const year = eventDate.getFullYear();
+    const month = eventDate.getMonth();
+    const day = eventDate.getDate();
     
-    const endTime = new Date(eventDate);
-    endTime.setHours(endHour, endMinute, 0, 0);
+    const startTime = new Date(year, month, day, startHour, startMinute, 0, 0);
+    const endTime = new Date(year, month, day, endHour, endMinute, 0, 0);
     
     if (endTime < startTime) {
       endTime.setDate(endTime.getDate() + 1);

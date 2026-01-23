@@ -21,8 +21,16 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function DayView({ date, events, onEventClick }: DayViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const hoursRef = useRef<HTMLDivElement>(null);
   const [currentTimePos, setCurrentTimePos] = useState<number | null>(null);
   const isCurrentDay = isSameDay(date, new Date());
+  
+  // Синхронизация скролла между часами и контентом
+  const handleScroll = () => {
+    if (containerRef.current && hoursRef.current) {
+      hoursRef.current.scrollTop = containerRef.current.scrollTop;
+    }
+  };
   
   // Обновление позиции текущего времени каждую минуту
   useEffect(() => {
@@ -73,7 +81,7 @@ export function DayView({ date, events, onEventClick }: DayViewProps) {
   
   return (
     <div className="day-view">
-      <div className="day-view-hours">
+      <div className="day-view-hours" ref={hoursRef}>
         {HOURS.map(hour => (
           <div key={hour} className="day-view-hour">
             <span className="day-view-hour-label">{hour.toString().padStart(2, '0')}:00</span>
@@ -85,7 +93,7 @@ export function DayView({ date, events, onEventClick }: DayViewProps) {
         </div>
       </div>
       
-      <div className="day-view-content" ref={containerRef}>
+      <div className="day-view-content" ref={containerRef} onScroll={handleScroll}>
         {/* Линия текущего времени */}
         {isCurrentDay && currentTimePos !== null && (
           <div 

@@ -11,6 +11,15 @@
 .day-view-hours {
   flex-shrink: 0;
   padding-right: 5px;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  min-height: 1500px; /* 24 часа * 60px + 60px для 24:00 */
+  padding-top: 10px;
+}
+
+.day-view-hours::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .day-view-hour {
@@ -36,6 +45,7 @@
   overflow-y: auto;
   height: 100%;
   min-height: 1500px; /* 24 часа * 60px + 60px для 24:00 (00:00 - 00:00) */
+  margin-top: 10px;
 }
 
 /* Сетка часов */

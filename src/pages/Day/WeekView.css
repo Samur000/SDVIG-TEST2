@@ -117,7 +117,14 @@
 /* Колонка с часами */
 .week-view-hours {
   flex-shrink: 0;
-  padding-top: 8px;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  min-height: 1500px; /* 24 часа * 60px + 60px для 24:00 */
+}
+
+.week-view-hours::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .week-view-hour {
@@ -138,7 +145,7 @@
 .week-view-content {
   flex: 1;
   position: relative;
-  overflow-y: hidden;
+  overflow-y: auto;
   overflow-x: hidden;
   height: 100%;
   min-height: 1500px; /* 24 часа * 60px + 60px для 24:00 (00:00 - 00:00) */

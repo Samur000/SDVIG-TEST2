@@ -21,9 +21,17 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function WeekView({ date, events, onEventClick }: WeekViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const hoursRef = useRef<HTMLDivElement>(null);
   const [currentTimePos, setCurrentTimePos] = useState<number | null>(null);
   
   const weekDates = useMemo(() => getWeekDates(date), [date]);
+  
+  // Синхронизация скролла между часами и контентом
+  const handleScroll = () => {
+    if (containerRef.current && hoursRef.current) {
+      hoursRef.current.scrollTop = containerRef.current.scrollTop;
+    }
+  };
   
   // Обновление позиции текущего времени
   useEffect(() => {
@@ -103,7 +111,7 @@ export function WeekView({ date, events, onEventClick }: WeekViewProps) {
     <div className="week-view">
       <div className="week-view-body">
         {/* Колонка с часами */}
-        <div className="week-view-hours">
+        <div className="week-view-hours" ref={hoursRef}>
           {HOURS.map(hour => (
             <div key={hour} className="week-view-hour">
               <span className="week-view-hour-label">{hour.toString().padStart(2, '0')}:00</span>
@@ -116,7 +124,7 @@ export function WeekView({ date, events, onEventClick }: WeekViewProps) {
         </div>
         
         {/* Область контента */}
-        <div className="week-view-content" ref={containerRef}>
+        <div className="week-view-content" ref={containerRef} onScroll={handleScroll}>
           {/* Линия текущего времени */}
           {currentTimePos !== null && isCurrentWeek && (
             <div 
