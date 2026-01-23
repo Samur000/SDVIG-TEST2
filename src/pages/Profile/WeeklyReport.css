@@ -194,7 +194,7 @@
 }
 
 .ring-card {
-  flex-shrink: 0;
+  flex: 1;
   width: 110px;
   padding: 16px 12px;
   background: var(--card-bg, #ffffff);

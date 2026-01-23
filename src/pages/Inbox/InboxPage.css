@@ -45,7 +45,6 @@
 
 .inbox-note-item-wrapper {
   position: relative;
-  overflow: hidden;
   border-radius: var(--radius-md);
   touch-action: pan-y;
 }
@@ -342,8 +341,8 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  margin: 0 -16px;
-  padding: 0 16px;
+  margin: 0;
+  padding: 0;
 }
 
 .inbox-folders-scroll::-webkit-scrollbar {

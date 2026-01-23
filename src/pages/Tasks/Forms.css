@@ -177,8 +177,9 @@
 
 .breakdown-task {
   padding: 16px;
-  background: #F9FAFB;
+  background: var(--bg-secondary);
   border-radius: var(--radius-md);
+  color: var(--text);
 }
 
 .breakdown-label {

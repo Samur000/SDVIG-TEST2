@@ -1,6 +1,6 @@
 /* Горизонтальный скролл кошельков с touch swipe */
 .wallets-scroll {
-  margin: 0 -16px 20px;
+  margin: 0 -3px 13px;
   padding: 0 16px;
   overflow-x: auto;
   overflow-y: hidden;
