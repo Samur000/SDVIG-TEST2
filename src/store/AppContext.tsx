@@ -35,6 +35,10 @@ import {
 // Флаг для показа модалки установки PWA (показывается один раз)
 const INSTALL_PROMPT_SHOWN_FLAG = 'sdvig_install_prompt_shown';
 
+// Текущая версия приложения и флаг для показа модалки "Что нового"
+const APP_VERSION = '2.1.1';
+const WHATS_NEW_SHOWN_FLAG = 'sdvig_whats_new_shown_version';
+
 // Проверка, запущено ли приложение как PWA (standalone)
 function isRunningAsPWA(): boolean {
   // Проверка для большинства браузеров
@@ -686,6 +690,251 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 /**
+ * Модалка "Что нового" - показывается при первом запуске новой версии
+ */
+function WhatsNewModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 10000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+      background: 'rgba(0,0,0,0.6)',
+      backdropFilter: 'blur(8px)',
+      animation: 'whatsNewFadeIn 0.4s ease'
+    }}>
+      <div style={{
+        background: 'var(--bg, #fff)',
+        borderRadius: '24px',
+        maxWidth: '380px',
+        width: '100%',
+        overflow: 'hidden',
+        boxShadow: '0 25px 80px rgba(0,0,0,0.4)',
+        animation: 'whatsNewSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
+      }}>
+        {/* Заголовок с анимированным градиентом */}
+        <div style={{
+          background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #A855F7 100%)',
+          padding: '32px 24px',
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Анимированные круги на фоне */}
+          <div style={{
+            position: 'absolute',
+            top: '-50%',
+            left: '-20%',
+            width: '200px',
+            height: '200px',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.1)',
+            animation: 'whatsNewFloat 6s ease-in-out infinite'
+          }} />
+          <div style={{
+            position: 'absolute',
+            bottom: '-30%',
+            right: '-10%',
+            width: '150px',
+            height: '150px',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.08)',
+            animation: 'whatsNewFloat 8s ease-in-out infinite reverse'
+          }} />
+          
+          {/* Иконка с анимацией */}
+          <div style={{
+            fontSize: '56px',
+            marginBottom: '16px',
+            animation: 'whatsNewBounce 0.6s ease 0.3s both',
+            position: 'relative',
+            zIndex: 1
+          }}>🚀</div>
+          
+          {/* Версия с badge */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(255,255,255,0.2)',
+            backdropFilter: 'blur(10px)',
+            padding: '6px 16px',
+            borderRadius: '20px',
+            marginBottom: '12px',
+            animation: 'whatsNewFadeIn 0.5s ease 0.4s both',
+            position: 'relative',
+            zIndex: 1
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: '#4ADE80',
+              animation: 'whatsNewPulse 2s ease infinite'
+            }} />
+            <span style={{
+              color: 'white',
+              fontSize: '13px',
+              fontWeight: 600,
+              letterSpacing: '0.5px'
+            }}>Версия {APP_VERSION}</span>
+          </div>
+          
+          <h2 style={{
+            color: 'white',
+            fontSize: '24px',
+            fontWeight: 700,
+            margin: 0,
+            animation: 'whatsNewFadeIn 0.5s ease 0.5s both',
+            position: 'relative',
+            zIndex: 1
+          }}>Добро пожаловать!</h2>
+        </div>
+        
+        {/* Контент */}
+        <div style={{ padding: '24px' }}>
+          {/* Основной текст */}
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '24px',
+            animation: 'whatsNewFadeIn 0.5s ease 0.6s both'
+          }}>
+            <p style={{
+              fontSize: '15px',
+              color: 'var(--text, #1F2937)',
+              margin: '0 0 16px 0',
+              lineHeight: 1.6
+            }}>
+              Спасибо, что используете <strong>СДВиГ</strong>! 
+            </p>
+            <p style={{
+              fontSize: '14px',
+              color: 'var(--muted, #6B7280)',
+              margin: 0,
+              lineHeight: 1.6
+            }}>
+              Узнайте о новых функциях, обновлениях и планах развития в нашем Telegram-канале
+            </p>
+          </div>
+          
+          {/* Ссылка на Telegram */}
+          <a
+            href="https://t.me/SDViGapp"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              width: '100%',
+              padding: '16px',
+              background: 'linear-gradient(135deg, #0088cc 0%, #00a8e8 100%)',
+              borderRadius: '14px',
+              color: 'white',
+              fontSize: '15px',
+              fontWeight: 600,
+              textDecoration: 'none',
+              marginBottom: '12px',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 15px rgba(0, 136, 204, 0.3)',
+              animation: 'whatsNewFadeIn 0.5s ease 0.7s both'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 136, 204, 0.4)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 136, 204, 0.3)';
+            }}
+          >
+            {/* Telegram иконка */}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+            </svg>
+            <span>Telegram-канал</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M7 17L17 7M17 7H7M17 7V17"/>
+            </svg>
+          </a>
+          
+          {/* Кнопка "Понял" */}
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%',
+              padding: '16px',
+              background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+              border: 'none',
+              borderRadius: '14px',
+              color: 'white',
+              fontSize: '16px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)',
+              animation: 'whatsNewFadeIn 0.5s ease 0.8s both'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 25px rgba(99, 102, 241, 0.4)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(99, 102, 241, 0.3)';
+            }}
+          >
+            Понял 👍
+          </button>
+        </div>
+      </div>
+      
+      <style>{`
+        @keyframes whatsNewFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes whatsNewSlideUp {
+          from { 
+            opacity: 0;
+            transform: translateY(40px) scale(0.9);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes whatsNewBounce {
+          0% { 
+            opacity: 0;
+            transform: scale(0) rotate(-10deg);
+          }
+          50% { 
+            transform: scale(1.2) rotate(5deg);
+          }
+          100% { 
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+          }
+        }
+        @keyframes whatsNewFloat {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(20px, -20px); }
+        }
+        @keyframes whatsNewPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(1.2); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/**
  * Модалка предложения установить приложение как PWA
  * Показывается только в браузере (не в standalone режиме)
  */
@@ -900,7 +1149,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  // Флаг, нужно ли показать модалку установки после закрытия "Что нового"
+  const shouldShowInstallAfterWhatsNew = useRef(false);
   
   // Ref для отслеживания, нужно ли сохранять
   const isInitialMount = useRef(true);
@@ -973,11 +1225,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         setIsLoaded(true);
         
-        // Показываем модалку установки только если:
-        // 1. Приложение открыто в браузере (не как PWA)
-        // 2. Модалка ещё не показывалась ранее
+        // Проверяем, нужно ли показать модалку "Что нового"
+        const lastShownVersion = localStorage.getItem(WHATS_NEW_SHOWN_FLAG);
+        const shouldShowWhatsNew = lastShownVersion !== APP_VERSION;
+        
+        // Проверяем, нужно ли показать модалку установки
         const installPromptShown = localStorage.getItem(INSTALL_PROMPT_SHOWN_FLAG);
-        if (!installPromptShown && !isRunningAsPWA()) {
+        const shouldShowInstall = !installPromptShown && !isRunningAsPWA();
+        
+        if (shouldShowWhatsNew) {
+          // Сначала показываем "Что нового"
+          setShowWhatsNew(true);
+          // Запоминаем, нужно ли после этого показать модалку установки
+          shouldShowInstallAfterWhatsNew.current = shouldShowInstall;
+        } else if (shouldShowInstall) {
+          // Если "Что нового" уже показывали для этой версии, показываем только установку
           setShowInstallPrompt(true);
         }
         
@@ -1027,6 +1289,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const theme = state.settings?.theme || 'light';
     document.documentElement.setAttribute('data-theme', theme);
   }, [state.settings?.theme]);
+
+  // ============ Закрытие модалки "Что нового" ============
+  const handleCloseWhatsNew = () => {
+    localStorage.setItem(WHATS_NEW_SHOWN_FLAG, APP_VERSION);
+    setShowWhatsNew(false);
+    
+    // После закрытия "Что нового" показываем модалку установки, если нужно
+    if (shouldShowInstallAfterWhatsNew.current) {
+      setTimeout(() => {
+        setShowInstallPrompt(true);
+      }, 300); // Небольшая задержка для плавности
+    }
+  };
 
   // ============ Закрытие модалки установки ============
   const handleCloseInstallPrompt = () => {
@@ -1106,6 +1381,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}
+      {showWhatsNew && <WhatsNewModal onClose={handleCloseWhatsNew} />}
       {showInstallPrompt && <InstallPromptModal onClose={handleCloseInstallPrompt} />}
     </AppContext.Provider>
   );
