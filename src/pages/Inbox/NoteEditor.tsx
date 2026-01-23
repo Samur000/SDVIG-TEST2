@@ -419,23 +419,11 @@ export function NoteEditor({
     }
   }, [editor]);
 
-  // Обработка кликов на чекбоксы (только по иконке)
-  // Используем mousedown чтобы предотвратить фокус на редактор
+  // Обработка кликов на чекбоксы - только toggle состояния БЕЗ фокуса
   useEffect(() => {
     if (!editor || !editorRef.current) return;
 
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      
-      // Переключаем только если клик именно на иконке чекбокса
-      const checkboxIcon = target.closest('.note-checkbox-icon');
-      if (!checkboxIcon) return;
-      
-      // Блокируем событие полностью чтобы не было фокуса
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      
+    const toggleCheckboxState = (checkboxIcon: HTMLElement) => {
       // Находим чекбокс-контейнер
       const checkbox = checkboxIcon.closest('[data-type="checkbox"]') as HTMLElement;
       if (!checkbox) return;
@@ -459,11 +447,31 @@ export function NoteEditor({
         const node = tr.doc.nodeAt(checkboxPos);
         if (node && node.type.name === 'checkbox') {
           const checked = !node.attrs.checked;
+          // Сохраняем текущую позицию курсора чтобы не двигать его
+          const currentSelection = state.selection;
           tr.setNodeMarkup(checkboxPos, undefined, { checked });
-          // Dispatch без фокуса - просто обновляем состояние
+          // Восстанавливаем селекцию чтобы курсор не двигался
+          tr.setSelection(currentSelection);
+          // Dispatch БЕЗ фокуса - только обновляем состояние
           view.dispatch(tr);
         }
       }
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Переключаем только если клик именно на иконке чекбокса
+      const checkboxIcon = target.closest('.note-checkbox-icon');
+      if (!checkboxIcon) return;
+      
+      // Блокируем событие полностью чтобы не было фокуса
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      // Toggle состояния БЕЗ фокуса
+      toggleCheckboxState(checkboxIcon as HTMLElement);
     };
 
     // Блокируем click чтобы не было перехода фокуса после mousedown
@@ -477,14 +485,30 @@ export function NoteEditor({
       }
     };
 
+    // Блокируем focusin чтобы предотвратить фокус при клике на чекбокс
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      const checkboxIcon = target.closest('.note-checkbox-icon');
+      if (checkboxIcon) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Убираем фокус если он установился
+        if (editor.view.dom.contains(target)) {
+          (target as HTMLElement).blur();
+        }
+      }
+    };
+
     const editorElement = editorRef.current.querySelector('.ProseMirror');
     if (editorElement) {
       // Используем capture phase для раннего перехвата
       editorElement.addEventListener('mousedown', handleMouseDown as EventListener, true);
       editorElement.addEventListener('click', handleClick as EventListener, true);
+      editorElement.addEventListener('focusin', handleFocusIn as EventListener, true);
       return () => {
         editorElement.removeEventListener('mousedown', handleMouseDown as EventListener, true);
         editorElement.removeEventListener('click', handleClick as EventListener, true);
+        editorElement.removeEventListener('focusin', handleFocusIn as EventListener, true);
       };
     }
   }, [editor]);
@@ -528,40 +552,113 @@ export function NoteEditor({
     
     // Для inline форматирования (bold, italic и т.д.) используем storedMarks
     // чтобы форматирование сохранялось при продолжении набора текста
-    const toggleMarkWithStore = (markName: string, toggleFn: () => void) => {
-      const { state } = editor;
-      const { from, to } = state.selection;
-      
-      // Выполняем toggle
-      toggleFn();
-      
-      // Если нет выделения (курсор), управляем storedMarks
-      if (from === to) {
-        const markType = state.schema.marks[markName];
-        if (markType) {
-          // После toggle проверяем новое состояние
-          setTimeout(() => {
-            const newIsActive = editor.isActive(markName);
-            if (newIsActive) {
-              // Если mark активен, добавляем его в storedMarks
-              const currentMarks = editor.state.storedMarks || editor.state.selection.$from.marks();
-              const hasThisMark = currentMarks.some(m => m.type.name === markName);
-              if (!hasThisMark) {
-                const newMark = markType.create();
-                const newMarks = [...currentMarks, newMark];
-                editor.view.dispatch(editor.state.tr.setStoredMarks(newMarks));
-              }
-            }
-          }, 0);
-        }
-      }
-    };
-    
     const commands: Record<string, () => void> = {
-      toggleBold: () => toggleMarkWithStore('bold', () => editor.chain().focus().toggleBold().run()),
-      toggleItalic: () => toggleMarkWithStore('italic', () => editor.chain().focus().toggleItalic().run()),
-      toggleUnderline: () => toggleMarkWithStore('underline', () => editor.chain().focus().toggleUnderline().run()),
-      toggleStrike: () => toggleMarkWithStore('strike', () => editor.chain().focus().toggleStrike().run()),
+      toggleBold: () => {
+        const { state, view } = editor;
+        const { from, to } = state.selection;
+        const markType = state.schema.marks['bold'];
+        const isActive = editor.isActive('bold');
+        
+        if (isActive) {
+          // Снимаем жирный
+          editor.chain().focus().toggleBold().run();
+          if (from === to) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const filteredMarks = currentMarks.filter(m => m.type.name !== 'bold');
+            view.dispatch(state.tr.setStoredMarks(filteredMarks));
+          }
+        } else {
+          // Включаем жирный
+          if (from === to && markType) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const hasBold = currentMarks.some(m => m.type.name === 'bold');
+            if (!hasBold) {
+              const newMark = markType.create();
+              const newMarks = [...currentMarks, newMark];
+              view.dispatch(state.tr.setStoredMarks(newMarks));
+            }
+          }
+          editor.chain().focus().toggleBold().run();
+        }
+      },
+      toggleItalic: () => {
+        const { state, view } = editor;
+        const { from, to } = state.selection;
+        const markType = state.schema.marks['italic'];
+        const isActive = editor.isActive('italic');
+        
+        if (isActive) {
+          editor.chain().focus().toggleItalic().run();
+          if (from === to) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const filteredMarks = currentMarks.filter(m => m.type.name !== 'italic');
+            view.dispatch(state.tr.setStoredMarks(filteredMarks));
+          }
+        } else {
+          if (from === to && markType) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const hasItalic = currentMarks.some(m => m.type.name === 'italic');
+            if (!hasItalic) {
+              const newMark = markType.create();
+              const newMarks = [...currentMarks, newMark];
+              view.dispatch(state.tr.setStoredMarks(newMarks));
+            }
+          }
+          editor.chain().focus().toggleItalic().run();
+        }
+      },
+      toggleUnderline: () => {
+        const { state, view } = editor;
+        const { from, to } = state.selection;
+        const markType = state.schema.marks['underline'];
+        const isActive = editor.isActive('underline');
+        
+        if (isActive) {
+          editor.chain().focus().toggleUnderline().run();
+          if (from === to) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const filteredMarks = currentMarks.filter(m => m.type.name !== 'underline');
+            view.dispatch(state.tr.setStoredMarks(filteredMarks));
+          }
+        } else {
+          if (from === to && markType) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const hasUnderline = currentMarks.some(m => m.type.name === 'underline');
+            if (!hasUnderline) {
+              const newMark = markType.create();
+              const newMarks = [...currentMarks, newMark];
+              view.dispatch(state.tr.setStoredMarks(newMarks));
+            }
+          }
+          editor.chain().focus().toggleUnderline().run();
+        }
+      },
+      toggleStrike: () => {
+        const { state, view } = editor;
+        const { from, to } = state.selection;
+        const markType = state.schema.marks['strike'];
+        const isActive = editor.isActive('strike');
+        
+        if (isActive) {
+          editor.chain().focus().toggleStrike().run();
+          if (from === to) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const filteredMarks = currentMarks.filter(m => m.type.name !== 'strike');
+            view.dispatch(state.tr.setStoredMarks(filteredMarks));
+          }
+        } else {
+          if (from === to && markType) {
+            const currentMarks = state.storedMarks || state.selection.$from.marks();
+            const hasStrike = currentMarks.some(m => m.type.name === 'strike');
+            if (!hasStrike) {
+              const newMark = markType.create();
+              const newMarks = [...currentMarks, newMark];
+              view.dispatch(state.tr.setStoredMarks(newMarks));
+            }
+          }
+          editor.chain().focus().toggleStrike().run();
+        }
+      },
       toggleBulletList: () => editor.chain().focus().toggleBulletList().run(),
       toggleOrderedList: () => editor.chain().focus().toggleOrderedList().run(),
       toggleHeading1: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),

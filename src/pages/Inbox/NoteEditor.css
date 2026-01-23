@@ -330,6 +330,13 @@
   background: transparent;
   transition: all 0.2s;
   margin-top: 2px;
+  pointer-events: auto;
+  /* Предотвращаем фокус */
+  outline: none;
+}
+
+.note-checkbox-icon:focus {
+  outline: none;
 }
 
 .note-checkbox-icon:hover {
