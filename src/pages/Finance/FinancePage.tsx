@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
 import { EmptyState } from '../../components/UI';
 import { useApp } from '../../store/AppContext';
 import { Transaction, Wallet, CURRENCY_SYMBOLS } from '../../types';
-import { formatDateShort, groupByDate, isThisWeek, isThisMonth } from '../../utils/date';
+import { formatDateShort, groupByDate, isThisMonth } from '../../utils/date';
 import { TransactionForm, TransactionFormHandle } from './TransactionForm';
 import { WalletForm, WalletIconSVG, WalletFormHandle } from './WalletForm';
 import './FinancePage.css';
@@ -12,6 +13,7 @@ import './FinancePage.css';
 const TRANSACTIONS_VISIBILITY_KEY = 'sdvig_finance_transactions_visible';
 
 export function FinancePage() {
+  const navigate = useNavigate();
   const { state, dispatch } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [showWalletForm, setShowWalletForm] = useState(false);
@@ -55,20 +57,23 @@ export function FinancePage() {
     [sortedTransactions]
   );
   
-  // Аналитика (только RUB для простоты)
-  const weekExpenses = useMemo(() => 
-    state.transactions
-      .filter(t => t.type === 'expense' && isThisWeek(t.date))
-      .reduce((sum, t) => sum + t.amount, 0),
-    [state.transactions]
-  );
-  
+  // Аналитика за месяц
   const monthExpenses = useMemo(() => 
     state.transactions
       .filter(t => t.type === 'expense' && isThisMonth(t.date))
       .reduce((sum, t) => sum + t.amount, 0),
     [state.transactions]
   );
+  
+  const monthIncome = useMemo(() => 
+    state.transactions
+      .filter(t => t.type === 'income' && isThisMonth(t.date))
+      .reduce((sum, t) => sum + t.amount, 0),
+    [state.transactions]
+  );
+  
+  const monthNet = monthIncome - monthExpenses;
+  const expenseRatio = monthIncome > 0 ? Math.min(100, Math.round((monthExpenses / monthIncome) * 100)) : 0;
   
   const topCategories = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
@@ -215,31 +220,42 @@ export function FinancePage() {
         ))}
       </div>
       
-      {/* Аналитика */}
-      <div className="analytics-section">
-        <h3>Аналитика расходов</h3>
-        <div className="analytics-cards">
-          <div className="analytics-card">
-            <span className="analytics-label">За неделю</span>
-            <span className="analytics-value">{formatMoney(weekExpenses)}</span>
+      {/* Карточка аналитики */}
+      <div 
+        className="analytics-preview-card"
+        onClick={() => navigate('/finance/analytics')}
+      >
+        <div className="analytics-preview-header">
+          <h3>Аналитика за месяц</h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="analytics-arrow">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </div>
+        
+        <div className="analytics-preview-stats">
+          <div className="preview-stat income">
+            <span className="preview-stat-label">Доходы</span>
+            <span className="preview-stat-value">+{formatMoney(monthIncome)}</span>
           </div>
-          <div className="analytics-card">
-            <span className="analytics-label">За месяц</span>
-            <span className="analytics-value">{formatMoney(monthExpenses)}</span>
+          <div className="preview-stat expense">
+            <span className="preview-stat-label">Расходы</span>
+            <span className="preview-stat-value">-{formatMoney(monthExpenses)}</span>
+          </div>
+          <div className={`preview-stat net ${monthNet >= 0 ? 'positive' : 'negative'}`}>
+            <span className="preview-stat-label">Итог</span>
+            <span className="preview-stat-value">{monthNet >= 0 ? '+' : ''}{formatMoney(monthNet)}</span>
           </div>
         </div>
         
+        <div className="analytics-preview-bar">
+          <div className="preview-bar-fill" style={{ width: `${expenseRatio}%` }} />
+        </div>
+        <span className="preview-bar-label">{expenseRatio}% доходов потрачено</span>
+        
         {topCategories.length > 0 && (
-          <div className="top-categories">
-            <span className="analytics-label">Топ категорий</span>
-            <div className="category-list">
-              {topCategories.map(([category, amount]) => (
-                <div key={category} className="category-item">
-                  <span>{category}</span>
-                  <span>{formatMoney(amount)}</span>
-                </div>
-              ))}
-            </div>
+          <div className="preview-top-category">
+            <span className="preview-top-label">Главная категория:</span>
+            <span className="preview-top-value">{topCategories[0][0]}</span>
           </div>
         )}
       </div>
