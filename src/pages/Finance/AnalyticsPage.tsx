@@ -4,6 +4,7 @@ import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
 import { useApp } from '../../store/AppContext';
 import { CURRENCY_SYMBOLS } from '../../types';
+import { WalletIconSVG } from './WalletForm';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -931,9 +932,7 @@ export function AnalyticsPage() {
                     className="account-icon"
                     style={{ backgroundColor: wallet.color + '20', color: wallet.color }}
                   >
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                      <rect x="2" y="5" width="20" height="14" rx="2"/>
-                    </svg>
+                    <WalletIconSVG icon={wallet.icon} color={wallet.color} size={18} />
                   </div>
                   <div className="account-info">
                     <span className="account-name">{wallet.name}</span>

@@ -5,7 +5,8 @@ import { formatDate, getToday, getDayOfWeek } from '../../utils/date';
 import { Modal } from '../../components/Modal';
 import { TaskForm, TaskFormHandle } from '../Tasks/TaskForm';
 import { CreateHabitModal } from '../Tasks/habits/CreateHabitModal';
-import { Task, Habit, Currency, CURRENCY_SYMBOLS } from '../../types';
+import { Task, Habit } from '../../types';
+import { AnalyticsPreviewCard } from '../Finance/AnalyticsPreviewCard';
 import './WeeklyReport.css';
 
 // Компонент бар-график для рутин (7 дней)
@@ -137,21 +138,15 @@ export function WeeklyReport() {
   const navigate = useNavigate();
   
   // States
-  const [financeMode, setFinanceMode] = useState<'balance' | 'income' | 'expense'>('balance');
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [isFinanceAnimating, setIsFinanceAnimating] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [showHabitsQuick, setShowHabitsQuick] = useState(false);
   const [loaded, setLoaded] = useState(false);
   
-  const financeCardRef = useRef<HTMLDivElement>(null);
   const taskFormRef = useRef<TaskFormHandle>(null);
   const [taskFormHasChanges, setTaskFormHasChanges] = useState(false);
   
   // Fallbacks
-  const wallets = state.wallets ?? [];
-  const transactions = state.transactions ?? [];
   const tasks = state.tasks ?? [];
   const habits = state.habits ?? [];
   const focusSessions = state.focusSessions ?? [];
@@ -161,100 +156,6 @@ export function WeeklyReport() {
     const timeout = setTimeout(() => setLoaded(true), 50);
     return () => clearTimeout(timeout);
   }, []);
-  
-  // Финансовые данные за неделю (по валютам)
-  const financeData = useMemo(() => {
-    const today = new Date();
-    
-    // Группируем балансы по валютам
-    const balancesByCurrency: Record<Currency, number> = {} as Record<Currency, number>;
-    wallets.forEach(w => {
-      const currency = w.currency || 'RUB';
-      balancesByCurrency[currency] = (balancesByCurrency[currency] || 0) + (w.balance || 0);
-    });
-    
-    // Группируем доходы и расходы по валютам за неделю
-    const incomeByCurrency: Record<Currency, number> = {} as Record<Currency, number>;
-    const expenseByCurrency: Record<Currency, number> = {} as Record<Currency, number>;
-    
-    // Данные для спарклайна (по дням, только для первой валюты или RUB)
-    const weekData: number[] = [];
-    const primaryCurrency = Object.keys(balancesByCurrency).find(c => balancesByCurrency[c as Currency] !== 0) as Currency || 'RUB';
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = formatDate(date);
-      
-      const dayTransactions = transactions.filter(t => t.date === dateStr);
-      let dayBalance = 0;
-      
-      dayTransactions.forEach(t => {
-        if (t.type === 'transfer') {
-          // Переводы: списание с исходного кошелька - расход, зачисление на целевой - доход
-          const fromWallet = wallets.find(w => w.id === t.walletId);
-          const toWallet = wallets.find(w => w.id === t.toWalletId);
-          
-          if (fromWallet) {
-            const fromCurrency = fromWallet.currency || 'RUB';
-            expenseByCurrency[fromCurrency] = (expenseByCurrency[fromCurrency] || 0) + t.amount;
-            if (fromCurrency === primaryCurrency) {
-              dayBalance -= t.amount;
-            }
-          }
-          
-          if (toWallet) {
-            const toCurrency = toWallet.currency || 'RUB';
-            const toAmount = t.toAmount || t.amount; // Если валюты разные, используем toAmount
-            incomeByCurrency[toCurrency] = (incomeByCurrency[toCurrency] || 0) + toAmount;
-            if (toCurrency === primaryCurrency) {
-              dayBalance += toAmount;
-            }
-          }
-        } else {
-          const wallet = wallets.find(w => w.id === t.walletId);
-          if (!wallet) return;
-          
-          const currency = wallet.currency || 'RUB';
-          
-          if (t.type === 'income') {
-            incomeByCurrency[currency] = (incomeByCurrency[currency] || 0) + t.amount;
-            if (currency === primaryCurrency) {
-              dayBalance += t.amount;
-            }
-          } else if (t.type === 'expense') {
-            expenseByCurrency[currency] = (expenseByCurrency[currency] || 0) + t.amount;
-            if (currency === primaryCurrency) {
-              dayBalance -= t.amount;
-            }
-          }
-        }
-      });
-      
-      weekData.push(dayBalance);
-    }
-    
-    // Вычисляем изменения за неделю по валютам
-    const weekChangeByCurrency: Record<Currency, number> = {} as Record<Currency, number>;
-    Object.keys(incomeByCurrency).forEach(currency => {
-      weekChangeByCurrency[currency as Currency] = (incomeByCurrency[currency as Currency] || 0) - (expenseByCurrency[currency as Currency] || 0);
-    });
-    Object.keys(expenseByCurrency).forEach(currency => {
-      if (!weekChangeByCurrency[currency as Currency]) {
-        weekChangeByCurrency[currency as Currency] = -(expenseByCurrency[currency as Currency] || 0);
-      }
-    });
-    
-    return {
-      balancesByCurrency,
-      incomeByCurrency,
-      expenseByCurrency,
-      weekChangeByCurrency,
-      sparklineBalance: weekData.map((_, i, arr) => arr.slice(0, i + 1).reduce((a, b) => a + b, 0)),
-      sparklineIncome: weekData.map(d => d > 0 ? d : 0),
-      sparklineExpense: weekData.map(d => d < 0 ? Math.abs(d) : 0),
-    };
-  }, [wallets, transactions]);
   
   // Статистика задач
   const tasksData = useMemo(() => {
@@ -433,128 +334,6 @@ export function WeeklyReport() {
     return null;
   }, [tasks, tasksData, habitsData]);
   
-  // Форматирование денег
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('ru-RU', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-  
-  // Свайп финансовой карточки
-  const touchStartY = useRef<number | null>(null);
-  const isHorizontalSwipe = useRef(false);
-  
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.touches[0].clientX);
-    touchStartY.current = e.touches[0].clientY;
-    isHorizontalSwipe.current = false;
-  };
-  
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStart === null || touchStartY.current === null) return;
-    
-    const diffX = Math.abs(touchStart - e.touches[0].clientX);
-    const diffY = Math.abs(touchStartY.current - e.touches[0].clientY);
-    
-    // Если горизонтальное движение больше вертикального, это горизонтальный свайп
-    if (diffX > diffY && diffX > 10) {
-      isHorizontalSwipe.current = true;
-      // Предотвращаем вертикальную прокрутку
-      e.preventDefault();
-    }
-  };
-  
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStart === null) return;
-    
-    const diff = touchStart - e.changedTouches[0].clientX;
-    const threshold = 50;
-    
-    // Обрабатываем только если это был горизонтальный свайп
-    if (isHorizontalSwipe.current && Math.abs(diff) > threshold) {
-      switchFinanceMode(diff > 0 ? 'next' : 'prev');
-    }
-    
-    setTouchStart(null);
-    touchStartY.current = null;
-    isHorizontalSwipe.current = false;
-  };
-  
-  const switchFinanceMode = (direction: 'next' | 'prev') => {
-    setIsFinanceAnimating(true);
-    setTimeout(() => {
-      if (direction === 'next') {
-        setFinanceMode(prev => 
-          prev === 'balance' ? 'income' : prev === 'income' ? 'expense' : 'balance'
-        );
-      } else {
-        setFinanceMode(prev => 
-          prev === 'balance' ? 'expense' : prev === 'expense' ? 'income' : 'balance'
-        );
-      }
-      setTimeout(() => setIsFinanceAnimating(false), 200);
-    }, 100);
-  };
-  
-  const handleDotClick = (mode: 'balance' | 'income' | 'expense', e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (mode !== financeMode) {
-      setIsFinanceAnimating(true);
-      setTimeout(() => {
-        setFinanceMode(mode);
-        setTimeout(() => setIsFinanceAnimating(false), 200);
-      }, 100);
-    }
-  };
-  
-  // Получить данные для текущего режима финансов
-  const getFinanceDisplay = () => {
-    switch (financeMode) {
-      case 'balance':
-        return {
-          label: 'Баланс',
-          valuesByCurrency: financeData.balancesByCurrency,
-          changeByCurrency: financeData.weekChangeByCurrency,
-          sparkline: financeData.sparklineBalance,
-          color: '#2186b4'
-        };
-      case 'income':
-        return {
-          label: 'Доход',
-          valuesByCurrency: financeData.incomeByCurrency,
-          changeByCurrency: financeData.incomeByCurrency,
-          sparkline: financeData.sparklineIncome,
-          color: '#22c55e'
-        };
-      case 'expense':
-        return {
-          label: 'Расход',
-          valuesByCurrency: financeData.expenseByCurrency,
-          changeByCurrency: Object.fromEntries(
-            Object.entries(financeData.expenseByCurrency).map(([curr, val]) => [curr, -val])
-          ) as Record<Currency, number>,
-          sparkline: financeData.sparklineExpense,
-          color: '#ef4444'
-        };
-    }
-  };
-  
-  const financeDisplay = getFinanceDisplay();
-  
-  // Получить список валют с ненулевыми значениями
-  const getActiveCurrencies = (values: Record<Currency, number>): Currency[] => {
-    return Object.entries(values)
-      .filter(([_, value]) => Math.abs(value) > 0.01)
-      .map(([currency]) => currency as Currency)
-      .sort((a, b) => {
-        // Сортируем: сначала RUB, потом остальные по алфавиту
-        if (a === 'RUB') return -1;
-        if (b === 'RUB') return 1;
-        return a.localeCompare(b);
-      });
-  };
-  
   // Сохранение задачи
   const handleSaveTask = (task: Task) => {
     dispatch({ type: 'ADD_TASK', payload: task });
@@ -574,66 +353,8 @@ export function WeeklyReport() {
   
   return (
     <div className="weekly-report">
-      {/* Финансовый блок */}
-      <div 
-        ref={financeCardRef}
-        className={`finance-card ${loaded ? 'loaded' : ''} ${isFinanceAnimating ? 'animating' : ''}`}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div className="finance-content">
-          
-          <div className="finance-info" onClick={() => navigate('/finance')}>
-            <span className="finance-label">{financeDisplay.label}</span>
-            <div className="finance-values">
-              {(() => {
-                const activeCurrencies = getActiveCurrencies(financeDisplay.valuesByCurrency);
-                if (activeCurrencies.length > 0) {
-                  return activeCurrencies.map(currency => {
-                    const value = financeDisplay.valuesByCurrency[currency] || 0;
-                    const change = financeDisplay.changeByCurrency[currency] || 0;
-                    return (
-                      <div key={currency} className="finance-currency-row">
-                        <span className={`finance-value ${financeMode}`}>
-                          {formatMoney(value)} {CURRENCY_SYMBOLS[currency]}
-                        </span>
-                        {Math.abs(change) > 0.01 && (
-                          <span className={`finance-change ${change >= 0 ? 'positive' : 'negative'}`}>
-                            {change >= 0 ? '↑' : '↓'} {change >= 0 ? '+' : ''}{formatMoney(Math.abs(change))} {CURRENCY_SYMBOLS[currency]} за неделю
-                          </span>
-                        )}
-                      </div>
-                    );
-                  });
-                } else {
-                  return (
-                    <span className={`finance-value ${financeMode}`}>
-                      0 ₽
-                    </span>
-                  );
-                }
-              })()}
-            </div>
-          </div>
-        
-        </div>
-        <div className="finance-dots">
-          <button 
-            className={`dot ${financeMode === 'balance' ? 'active' : ''}`} 
-            onClick={(e) => handleDotClick('balance', e)}
-          />
-          <button 
-            className={`dot ${financeMode === 'income' ? 'active' : ''}`} 
-            onClick={(e) => handleDotClick('income', e)}
-          />
-          <button 
-            className={`dot ${financeMode === 'expense' ? 'active' : ''}`} 
-            onClick={(e) => handleDotClick('expense', e)}
-          />
-        </div>
-      </div>
-      
+      <AnalyticsPreviewCard />
+
       {/* Карточка рутины */}
       {state.routines.length > 0 && (
         <div 
