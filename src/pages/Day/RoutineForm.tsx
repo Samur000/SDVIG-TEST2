@@ -24,8 +24,9 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
   const [title, setTitle] = useState(routine?.title || '');
   const [description, setDescription] = useState(routine?.description || '');
   const [time, setTime] = useState(routine?.time || '');
-  const [duration, setDuration] = useState<number>(routine?.duration || 30);
+  const [durationStr, setDurationStr] = useState<string>(routine?.duration ? String(routine.duration) : '');
   const [days, setDays] = useState<DayOfWeek[]>(routine?.days || ALL_DAYS);
+  const [durationError, setDurationError] = useState<string | null>(null);
   
   // Отслеживание изменений
   const initialValue = useMemo(() => {
@@ -34,7 +35,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
         title: routine.title,
         description: routine.description || '',
         time: routine.time || '',
-        duration: routine.duration || 30,
+        durationStr: routine.duration ? String(routine.duration) : '',
         days: routine.days
       };
     } else {
@@ -42,7 +43,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
         title: '',
         description: '',
         time: '',
-        duration: 30,
+        durationStr: '',
         days: ALL_DAYS
       };
     }
@@ -54,14 +55,14 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
       title,
       description,
       time,
-      duration,
+      durationStr,
       days: [...days].sort()
     }),
     (a, b) => {
       return a.title === b.title &&
         a.description === b.description &&
         a.time === b.time &&
-        a.duration === b.duration &&
+        a.durationStr === b.durationStr &&
         JSON.stringify([...a.days].sort()) === JSON.stringify([...b.days].sort());
     }
   );
@@ -83,7 +84,14 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
   
   const handleSave = () => {
     if (!title.trim() || days.length === 0) return;
-    if (duration < 10) return; // Минимум 10 минут
+    
+    // Проверка продолжительности
+    const durationNum = durationStr ? parseInt(durationStr, 10) : undefined;
+    if (durationStr && (!durationNum || durationNum < 10)) {
+      setDurationError('Продолжительность должна быть минимум 10 минут');
+      return;
+    }
+    setDurationError(null);
     
     // Вибрация при создании новой рутины
     if (!routine) {
@@ -95,7 +103,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
       title: title.trim(),
       description: description.trim() || undefined,
       time: time || undefined,
-      duration: duration >= 10 ? duration : 30,
+      duration: durationNum && durationNum >= 10 ? durationNum : undefined,
       days,
       completed: routine?.completed || {},
       // При создании новой рутины устанавливаем дату создания
@@ -107,7 +115,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
   useImperativeHandle(ref, () => ({
     hasChanges,
     save: handleSave
-  }), [hasChanges, title, description, time, duration, days]);
+  }), [hasChanges, title, description, time, durationStr, days]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,18 +161,25 @@ export const RoutineForm = forwardRef<RoutineFormHandle, RoutineFormProps>(({ ro
               type="number"
               min="10"
               step="5"
-              value={duration}
+              value={durationStr}
               onChange={e => {
-                const value = parseInt(e.target.value) || 10;
-                setDuration(Math.max(10, value));
+                setDurationStr(e.target.value);
+                setDurationError(null);
               }}
-              placeholder="30"
+              placeholder="60"
+              style={durationError ? { borderColor: '#EF4444' } : undefined}
             />
           </div>
         </div>
-        <small style={{ color: 'var(--muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-          Минимум 10 минут
-        </small>
+        {durationError ? (
+          <small style={{ color: '#EF4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+            {durationError}
+          </small>
+        ) : (
+          <small style={{ color: 'var(--muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+            Минимум 10 минут
+          </small>
+        )}
       </div>
       
       <div className="form-group">

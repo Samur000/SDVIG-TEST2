@@ -301,7 +301,6 @@
 .week-view-event-routine {
   border-left-style: dashed !important;
   border-left-width: 2px !important;
-  position: relative;
 }
 
 .week-view-event-routine::before {
