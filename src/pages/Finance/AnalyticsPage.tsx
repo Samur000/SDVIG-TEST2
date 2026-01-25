@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
@@ -51,7 +51,10 @@ export function AnalyticsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
-  
+  const [chartCurrency, setChartCurrency] = useState<string>('RUB');
+  const [chartCurrencyOpen, setChartCurrencyOpen] = useState(false);
+  const chartCurrencyRef = useRef<HTMLDivElement>(null);
+
   // Вычисление дат периода
   const { startDate, endDate, prevStartDate, prevEndDate } = useMemo(() => {
     const now = new Date();
@@ -97,14 +100,17 @@ export function AnalyticsPage() {
     return { startDate: start, endDate: end, prevStartDate: prevStart, prevEndDate: prevEnd };
   }, [periodType, periodRange]);
   
-  // Фильтрация транзакций
+  const getTxCurrency = (tx: { walletId: string }) =>
+    state.wallets.find(w => w.id === tx.walletId)?.currency ?? 'RUB';
+
+  // Фильтрация транзакций (переводы считаем расходом — показываем в режиме «расходы» и «все»)
   const filteredTransactions = useMemo(() => {
     return state.transactions.filter(tx => {
       const txDate = new Date(tx.date);
       if (txDate < startDate || txDate > endDate) return false;
       if (selectedWallets.length > 0 && !selectedWallets.includes(tx.walletId)) return false;
       if (viewMode === 'income' && tx.type !== 'income') return false;
-      if (viewMode === 'expense' && tx.type !== 'expense') return false;
+      if (viewMode === 'expense' && (tx.type !== 'expense' && tx.type !== 'transfer')) return false;
       return true;
     });
   }, [state.transactions, startDate, endDate, selectedWallets, viewMode]);
@@ -120,75 +126,157 @@ export function AnalyticsPage() {
     });
   }, [state.transactions, prevStartDate, prevEndDate, selectedWallets, periodType]);
   
-  // Суммы
+  // Суммы по валютам (переводы = расход)
   const totals = useMemo(() => {
-    const income = filteredTransactions
-      .filter(tx => tx.type === 'income')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-    const expense = filteredTransactions
-      .filter(tx => tx.type === 'expense')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-    return { income, expense, net: income - expense };
-  }, [filteredTransactions]);
+    const incomeByCurrency: Record<string, number> = {};
+    const expenseByCurrency: Record<string, number> = {};
+    filteredTransactions.forEach(tx => {
+      const cur = getTxCurrency(tx);
+      if (tx.type === 'income') {
+        incomeByCurrency[cur] = (incomeByCurrency[cur] ?? 0) + tx.amount;
+      } else if (tx.type === 'expense') {
+        expenseByCurrency[cur] = (expenseByCurrency[cur] ?? 0) + tx.amount;
+      } else if (tx.type === 'transfer') {
+        expenseByCurrency[cur] = (expenseByCurrency[cur] ?? 0) + tx.amount;
+        if (tx.toWalletId) {
+          const toCur = state.wallets.find(w => w.id === tx.toWalletId)?.currency ?? 'RUB';
+          const toAmt = tx.toAmount ?? tx.amount;
+          incomeByCurrency[toCur] = (incomeByCurrency[toCur] ?? 0) + toAmt;
+        }
+      }
+    });
+    const allCurrencies = new Set([...Object.keys(incomeByCurrency), ...Object.keys(expenseByCurrency)]);
+    const netByCurrency: Record<string, number> = {};
+    allCurrencies.forEach(c => {
+      netByCurrency[c] = (incomeByCurrency[c] ?? 0) - (expenseByCurrency[c] ?? 0);
+    });
+    return { incomeByCurrency, expenseByCurrency, netByCurrency, allCurrencies: [...allCurrencies].sort() };
+  }, [filteredTransactions, state.wallets]);
   
   const prevTotals = useMemo(() => {
-    const income = prevTransactions
-      .filter(tx => tx.type === 'income')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-    const expense = prevTransactions
-      .filter(tx => tx.type === 'expense')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-    return { income, expense, net: income - expense };
-  }, [prevTransactions]);
+    const incomeByCurrency: Record<string, number> = {};
+    const expenseByCurrency: Record<string, number> = {};
+    prevTransactions.forEach(tx => {
+      const cur = state.wallets.find(w => w.id === tx.walletId)?.currency ?? 'RUB';
+      if (tx.type === 'income') {
+        incomeByCurrency[cur] = (incomeByCurrency[cur] ?? 0) + tx.amount;
+      } else if (tx.type === 'expense') {
+        expenseByCurrency[cur] = (expenseByCurrency[cur] ?? 0) + tx.amount;
+      } else if (tx.type === 'transfer') {
+        expenseByCurrency[cur] = (expenseByCurrency[cur] ?? 0) + tx.amount;
+        if (tx.toWalletId) {
+          const toCur = state.wallets.find(w => w.id === tx.toWalletId)?.currency ?? 'RUB';
+          const toAmt = tx.toAmount ?? tx.amount;
+          incomeByCurrency[toCur] = (incomeByCurrency[toCur] ?? 0) + toAmt;
+        }
+      }
+    });
+    const allCurrencies = new Set([...Object.keys(incomeByCurrency), ...Object.keys(expenseByCurrency)]);
+    const netByCurrency: Record<string, number> = {};
+    allCurrencies.forEach(c => {
+      netByCurrency[c] = (incomeByCurrency[c] ?? 0) - (expenseByCurrency[c] ?? 0);
+    });
+    return { incomeByCurrency, expenseByCurrency, netByCurrency, allCurrencies: [...allCurrencies].sort() };
+  }, [prevTransactions, state.wallets]);
+
+  useEffect(() => {
+    if (totals.allCurrencies.length > 0 && !totals.allCurrencies.includes(chartCurrency)) {
+      setChartCurrency(totals.allCurrencies[0]);
+    }
+  }, [totals.allCurrencies, chartCurrency]);
+
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (chartCurrencyRef.current && !chartCurrencyRef.current.contains(e.target as Node)) {
+        setChartCurrencyOpen(false);
+      }
+    };
+    if (chartCurrencyOpen) {
+      document.addEventListener('mousedown', onOutside);
+      return () => document.removeEventListener('mousedown', onOutside);
+    }
+  }, [chartCurrencyOpen]);
   
-  // Изменение в процентах
+  // Изменение в % по валютам
   const changes = useMemo(() => {
-    const calcChange = (current: number, prev: number) => {
-      if (prev === 0) return current > 0 ? 100 : 0;
-      return Math.round(((current - prev) / prev) * 100);
-    };
-    return {
-      income: calcChange(totals.income, prevTotals.income),
-      expense: calcChange(totals.expense, prevTotals.expense),
-    };
+    const calc = (cur: number, prev: number) => (prev === 0 ? (cur > 0 ? 100 : 0) : Math.round(((cur - prev) / prev) * 100));
+    const income: Record<string, number> = {};
+    const expense: Record<string, number> = {};
+    totals.allCurrencies.forEach(c => {
+      income[c] = calc(totals.incomeByCurrency[c] ?? 0, prevTotals.incomeByCurrency[c] ?? 0);
+      expense[c] = calc(totals.expenseByCurrency[c] ?? 0, prevTotals.expenseByCurrency[c] ?? 0);
+    });
+    return { income, expense };
   }, [totals, prevTotals]);
   
-  // Категории расходов
+  // Категории расходов (включая переводы), по валютам
+  const primaryCurrency = totals.allCurrencies[0] ?? 'RUB';
   const expensesByCategory = useMemo(() => {
-    const categories: Record<string, number> = {};
+    const map: Record<string, Record<string, number>> = {};
     filteredTransactions
-      .filter(tx => tx.type === 'expense')
+      .filter(tx => tx.type === 'expense' || tx.type === 'transfer')
       .forEach(tx => {
-        categories[tx.category] = (categories[tx.category] || 0) + tx.amount;
+        const cur = getTxCurrency(tx);
+        if (!map[tx.category]) map[tx.category] = {};
+        map[tx.category][cur] = (map[tx.category][cur] ?? 0) + tx.amount;
       });
-    return Object.entries(categories)
-      .sort(([, a], [, b]) => b - a)
-      .map(([name, amount]) => ({
-        name,
-        amount,
-        percent: totals.expense > 0 ? Math.round((amount / totals.expense) * 100) : 0
-      }));
-  }, [filteredTransactions, totals.expense]);
+    const primaryExp = totals.expenseByCurrency[primaryCurrency] ?? 0;
+    return Object.entries(map)
+      .map(([name, byCurrency]) => {
+        const amount = byCurrency[primaryCurrency] ?? 0;
+        const percent = primaryExp > 0 ? Math.round((amount / primaryExp) * 100) : 0;
+        return { name, byCurrency, amount, percent };
+      })
+      .sort((a, b) => b.amount - a.amount);
+  }, [filteredTransactions, totals.expenseByCurrency, primaryCurrency, state.wallets]);
   
-  // Данные для графика по времени
+  const getToCurrency = (tx: { toWalletId?: string }) =>
+    tx.toWalletId ? (state.wallets.find(w => w.id === tx.toWalletId)?.currency ?? 'RUB') : null;
+
+  // Транзакции для графика: выбранная валюта по источнику ИЛИ по назначению (перевод)
+  const chartTransactions = useMemo(() => {
+    return filteredTransactions.filter(tx => {
+      const src = getTxCurrency(tx);
+      if (tx.type === 'income' || tx.type === 'expense') return src === chartCurrency;
+      if (tx.type === 'transfer') return src === chartCurrency || getToCurrency(tx) === chartCurrency;
+      return false;
+    });
+  }, [filteredTransactions, chartCurrency, state.wallets]);
+
+  // Данные для графика по времени (переводы = расход)
   const chartData = useMemo(() => {
     const now = new Date();
     now.setHours(23, 59, 59, 999);
 
-    // Для "всё время": период = с первой операции по сей день
     let chartStart = startDate;
     let chartEnd = endDate;
-    if (periodType === 'all' && filteredTransactions.length > 0) {
-      const firstDateStr = filteredTransactions.reduce((min, tx) => (tx.date < min ? tx.date : min), filteredTransactions[0].date);
+    if (periodType === 'all' && chartTransactions.length > 0) {
+      const firstDateStr = chartTransactions.reduce((min, tx) => (tx.date < min ? tx.date : min), chartTransactions[0].date);
       chartStart = new Date(firstDateStr);
       chartStart.setHours(0, 0, 0, 0);
       chartEnd = new Date(now);
     }
 
-    // Режим группировки: год — по месяцам; "всё время" — по длительности с первой операции
     const daysSinceFirst = Math.ceil((chartEnd.getTime() - chartStart.getTime()) / (1000 * 60 * 60 * 24));
     const allTimeByMonth = periodType === 'all' && daysSinceFirst >= 30;
     const shouldGroupByMonth = periodType === 'year' || (periodType === 'all' && allTimeByMonth);
+
+    const addToSlot = (
+      slot: { income: number; expense: number } | undefined,
+      tx: { type: string; amount: number; walletId: string; toWalletId?: string; toAmount?: number; date: string }
+    ) => {
+      if (!slot) return;
+      const src = getTxCurrency(tx);
+      const dest = getToCurrency(tx);
+      if (tx.type === 'income') {
+        if (src === chartCurrency) slot.income += tx.amount;
+      } else if (tx.type === 'expense') {
+        if (src === chartCurrency) slot.expense += tx.amount;
+      } else if (tx.type === 'transfer') {
+        if (src === chartCurrency) slot.expense += tx.amount;
+        if (dest === chartCurrency) slot.income += tx.toAmount ?? tx.amount;
+      }
+    };
 
     if (shouldGroupByMonth) {
       const monthsData: Record<string, { income: number; expense: number }> = {};
@@ -200,7 +288,6 @@ export function AnalyticsPage() {
           monthsData[key] = { income: 0, expense: 0 };
         }
       } else {
-        // "Всё время": от первого дня первой операции до конца текущего месяца
         const current = new Date(chartStart.getFullYear(), chartStart.getMonth(), 1);
         const endMonth = new Date(chartEnd.getFullYear(), chartEnd.getMonth() + 1, 0);
         while (current <= endMonth) {
@@ -210,13 +297,10 @@ export function AnalyticsPage() {
         }
       }
 
-      filteredTransactions.forEach(tx => {
+      chartTransactions.forEach(tx => {
         const txDate = new Date(tx.date);
         const key = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
-        if (monthsData[key]) {
-          if (tx.type === 'income') monthsData[key].income += tx.amount;
-          else if (tx.type === 'expense') monthsData[key].expense += tx.amount;
-        }
+        addToSlot(monthsData[key], tx);
       });
 
       const sortedMonths = Object.keys(monthsData).sort();
@@ -235,7 +319,6 @@ export function AnalyticsPage() {
       };
     }
 
-    // По дням: неделя, месяц или "всё время" с первой операции, если прошло < 30 дней
     const daysInPeriod: Record<string, { income: number; expense: number }> = {};
     const current = new Date(chartStart);
     current.setHours(0, 0, 0, 0);
@@ -248,13 +331,7 @@ export function AnalyticsPage() {
       current.setDate(current.getDate() + 1);
     }
 
-    filteredTransactions.forEach(tx => {
-      const dateStr = tx.date;
-      if (daysInPeriod[dateStr]) {
-        if (tx.type === 'income') daysInPeriod[dateStr].income += tx.amount;
-        else if (tx.type === 'expense') daysInPeriod[dateStr].expense += tx.amount;
-      }
-    });
+    chartTransactions.forEach(tx => addToSlot(daysInPeriod[tx.date], tx));
 
     const sortedDates = Object.keys(daysInPeriod).sort();
     const labels = sortedDates.map(d => {
@@ -269,7 +346,7 @@ export function AnalyticsPage() {
         { label: 'Расходы', data: sortedDates.map(d => daysInPeriod[d].expense), borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 6 },
       ],
     };
-  }, [filteredTransactions, startDate, endDate, periodType]);
+  }, [chartTransactions, startDate, endDate, periodType, chartCurrency, state.wallets]);
   
   // Опции графика
   const chartOptions = {
@@ -342,139 +419,127 @@ export function AnalyticsPage() {
     }
   };
   
-  // Изменения по счетам за период
+  // Изменения по счетам за период (переводы: списание с source, зачисление в toWallet)
   const walletChanges = useMemo(() => {
     const changes: Record<string, { income: number; expense: number; net: number }> = {};
-    
-    state.wallets.forEach(wallet => {
-      changes[wallet.id] = { income: 0, expense: 0, net: 0 };
-    });
-    
+    state.wallets.forEach(w => { changes[w.id] = { income: 0, expense: 0, net: 0 }; });
+
     filteredTransactions.forEach(tx => {
-      if (!changes[tx.walletId]) return;
       if (tx.type === 'income') {
-        changes[tx.walletId].income += tx.amount;
-        changes[tx.walletId].net += tx.amount;
+        if (changes[tx.walletId]) {
+          changes[tx.walletId].income += tx.amount;
+          changes[tx.walletId].net += tx.amount;
+        }
       } else if (tx.type === 'expense') {
-        changes[tx.walletId].expense += tx.amount;
-        changes[tx.walletId].net -= tx.amount;
+        if (changes[tx.walletId]) {
+          changes[tx.walletId].expense += tx.amount;
+          changes[tx.walletId].net -= tx.amount;
+        }
+      } else if (tx.type === 'transfer') {
+        if (changes[tx.walletId]) {
+          changes[tx.walletId].expense += tx.amount;
+          changes[tx.walletId].net -= tx.amount;
+        }
+        const toId = tx.toWalletId;
+        if (toId && changes[toId]) {
+          const toAmt = tx.toAmount ?? tx.amount;
+          changes[toId].income += toAmt;
+          changes[toId].net += toAmt;
+        }
       }
     });
-    
     return changes;
   }, [state.wallets, filteredTransactions]);
   
-  // Самый затратный день
+  // Самый затратный день (только отток в выбранной валюте: расходы + исходящие переводы)
   const mostExpensiveDay = useMemo(() => {
     const byDay: Record<string, number> = {};
-    filteredTransactions
-      .filter(tx => tx.type === 'expense')
-      .forEach(tx => {
-        byDay[tx.date] = (byDay[tx.date] || 0) + tx.amount;
-      });
+    chartTransactions.forEach(tx => {
+      const src = getTxCurrency(tx);
+      if (src !== chartCurrency) return;
+      if (tx.type === 'expense') byDay[tx.date] = (byDay[tx.date] || 0) + tx.amount;
+      else if (tx.type === 'transfer') byDay[tx.date] = (byDay[tx.date] || 0) + tx.amount;
+    });
     const sorted = Object.entries(byDay).sort(([, a], [, b]) => b - a);
     if (sorted.length === 0) return null;
     const [date, amount] = sorted[0];
-    return { date: new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }), amount };
-  }, [filteredTransactions]);
+    return { date: new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }), amount, currency: chartCurrency };
+  }, [chartTransactions, chartCurrency, state.wallets]);
   
-  // Форматирование денег (определено раньше для использования в insights)
   const formatMoney = (amount: number, currency: string = 'RUB') => {
     const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || '₽';
-    return new Intl.NumberFormat('ru-RU', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount) + ' ' + symbol;
+    return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount) + ' ' + symbol;
   };
+
+  const formatMoneyByCurrency = (byCurrency: Record<string, number>) =>
+    totals.allCurrencies
+      .filter(c => (byCurrency[c] ?? 0) !== 0)
+      .map(c => formatMoney(byCurrency[c] ?? 0, c))
+      .join(', ') || '—';
+
+  const formatNetByCurrency = (netByCurrency: Record<string, number>) =>
+    totals.allCurrencies
+      .filter(c => (netByCurrency[c] ?? 0) !== 0)
+      .map(c => {
+        const v = netByCurrency[c] ?? 0;
+        return (v >= 0 ? '+' : '') + formatMoney(v, c);
+      })
+      .join(', ') || '—';
+
+  const formatIncomeByCurrency = (byCurrency: Record<string, number>) =>
+    totals.allCurrencies
+      .filter(c => (byCurrency[c] ?? 0) !== 0)
+      .map(c => '+' + formatMoney(byCurrency[c] ?? 0, c))
+      .join(', ') || '—';
+
+  const formatExpenseByCurrency = (byCurrency: Record<string, number>) =>
+    totals.allCurrencies
+      .filter(c => (byCurrency[c] ?? 0) !== 0)
+      .map(c => '−' + formatMoney(byCurrency[c] ?? 0, c))
+      .join(', ') || '—';
   
-  // Автоматические инсайты
+  const primaryInc = totals.incomeByCurrency[primaryCurrency] ?? 0;
+  const primaryExp = totals.expenseByCurrency[primaryCurrency] ?? 0;
+  const primaryNet = totals.netByCurrency[primaryCurrency] ?? 0;
+
+  // Автоматические инсайты (по валютам)
   const insights = useMemo(() => {
     const list: { type: 'info' | 'positive' | 'warning'; text: string }[] = [];
-    
-    // Главная категория расходов
     if (expensesByCategory[0]) {
-      list.push({
-        type: 'info',
-        text: `Главная категория расходов — ${expensesByCategory[0].name} (${expensesByCategory[0].percent}% от всех расходов)`
-      });
+      list.push({ type: 'info', text: `Главная категория расходов — ${expensesByCategory[0].name} (${expensesByCategory[0].percent}% от всех расходов)` });
     }
-    
-    // Баланс
-    if (totals.net > 0) {
-      list.push({
-        type: 'positive',
-        text: `Вы сэкономили ${formatMoney(totals.net)} за этот период`
-      });
-    } else if (totals.net < 0) {
-      list.push({
-        type: 'warning',
-        text: `Расходы превышают доходы на ${formatMoney(Math.abs(totals.net))}`
-      });
+    const netStr = formatMoneyByCurrency(totals.netByCurrency);
+    if (primaryNet > 0 && netStr !== '—') {
+      list.push({ type: 'positive', text: `Вы сэкономили ${netStr} за этот период` });
+    } else if (primaryNet < 0 && netStr !== '—') {
+      list.push({ type: 'warning', text: `Расходы превышают доходы на ${netStr}` });
     }
-    
-    // Рост расходов
-    if (periodType !== 'all' && changes.expense > 20) {
-      list.push({
-        type: 'warning',
-        text: `Расходы выросли на ${changes.expense}% по сравнению с прошлым периодом`
-      });
+    const expCh = changes.expense[primaryCurrency] ?? 0;
+    if (periodType !== 'all' && expCh > 20) {
+      list.push({ type: 'warning', text: `Расходы выросли на ${expCh}% по сравнению с прошлым периодом` });
     }
-    
-    // Снижение расходов
-    if (periodType !== 'all' && changes.expense < -10) {
-      list.push({
-        type: 'positive',
-        text: `Расходы снизились на ${Math.abs(changes.expense)}% по сравнению с прошлым периодом`
-      });
+    if (periodType !== 'all' && expCh < -10) {
+      list.push({ type: 'positive', text: `Расходы снизились на ${Math.abs(expCh)}% по сравнению с прошлым периодом` });
     }
-    
-    // Рост доходов
-    if (periodType !== 'all' && changes.income > 20) {
-      list.push({
-        type: 'positive',
-        text: `Доходы выросли на ${changes.income}% — отличная динамика!`
-      });
+    const incCh = changes.income[primaryCurrency] ?? 0;
+    if (periodType !== 'all' && incCh > 20) {
+      list.push({ type: 'positive', text: `Доходы выросли на ${incCh}% — отличная динамика!` });
     }
-    
-    // Процент потраченного
-    if (totals.income > 0) {
-      const spentRatio = Math.round((totals.expense / totals.income) * 100);
-      if (spentRatio > 90) {
-        list.push({
-          type: 'warning',
-          text: `Вы потратили ${spentRatio}% от доходов — стоит обратить внимание на расходы`
-        });
-      } else if (spentRatio < 50) {
-        list.push({
-          type: 'positive',
-          text: `Вы потратили только ${spentRatio}% от доходов — хорошая экономия!`
-        });
-      }
+    if (primaryInc > 0) {
+      const spentRatio = Math.round((primaryExp / primaryInc) * 100);
+      if (spentRatio > 90) list.push({ type: 'warning', text: `Вы потратили ${spentRatio}% от доходов — стоит обратить внимание на расходы` });
+      else if (spentRatio < 50) list.push({ type: 'positive', text: `Вы потратили только ${spentRatio}% от доходов — хорошая экономия!` });
     }
-    
-    // Самый затратный день
-    if (mostExpensiveDay && mostExpensiveDay.amount > totals.expense * 0.2) {
-      list.push({
-        type: 'info',
-        text: `Самый затратный день: ${mostExpensiveDay.date} — ${formatMoney(mostExpensiveDay.amount)}`
-      });
+    if (mostExpensiveDay && primaryExp > 0 && mostExpensiveDay.amount > primaryExp * 0.2) {
+      list.push({ type: 'info', text: `Самый затратный день: ${mostExpensiveDay.date} — ${formatMoney(mostExpensiveDay.amount, mostExpensiveDay.currency)}` });
     }
-    
-    // Категории без операций
     if (expensesByCategory.length === 0 && filteredTransactions.length > 0) {
-      list.push({
-        type: 'info',
-        text: 'Все операции за период — доходы. Расходов нет.'
-      });
+      list.push({ type: 'info', text: 'Все операции за период — доходы. Расходов нет.' });
     }
-    
-    return list.slice(0, 5); // Не более 5 инсайтов
-  }, [expensesByCategory, totals, changes, periodType, mostExpensiveDay, filteredTransactions]);
-  
-  // Процент расходов от доходов
-  const expenseRatio = totals.income > 0 
-    ? Math.min(100, Math.round((totals.expense / totals.income) * 100))
-    : 0;
+    return list.slice(0, 5);
+  }, [expensesByCategory, totals, changes, periodType, mostExpensiveDay, filteredTransactions, primaryCurrency, primaryInc, primaryExp, primaryNet]);
+
+  const expenseRatio = primaryInc > 0 ? Math.min(100, Math.round((primaryExp / primaryInc) * 100)) : 0;
   
   // Поиск и сортировка транзакций для списка
   const displayedTransactions = useMemo(() => {
@@ -509,41 +574,65 @@ export function AnalyticsPage() {
     return txs;
   }, [filteredTransactions, searchQuery, sortOrder]);
   
-  // Мини-итог по отфильтрованному списку
+  // Мини-итог по отфильтрованному списку (перевод: отток = расход, приток = доход)
   const displayedTotals = useMemo(() => {
-    const income = displayedTransactions.filter(tx => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
-    const expense = displayedTransactions.filter(tx => tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0);
-    return { count: displayedTransactions.length, income, expense, net: income - expense };
-  }, [displayedTransactions]);
+    const incomeByCurrency: Record<string, number> = {};
+    const expenseByCurrency: Record<string, number> = {};
+    displayedTransactions.forEach(tx => {
+      const cur = getTxCurrency(tx);
+      if (tx.type === 'income') {
+        incomeByCurrency[cur] = (incomeByCurrency[cur] ?? 0) + tx.amount;
+      } else if (tx.type === 'expense') {
+        expenseByCurrency[cur] = (expenseByCurrency[cur] ?? 0) + tx.amount;
+      } else if (tx.type === 'transfer') {
+        expenseByCurrency[cur] = (expenseByCurrency[cur] ?? 0) + tx.amount;
+        if (tx.toWalletId) {
+          const toCur = state.wallets.find(w => w.id === tx.toWalletId)?.currency ?? 'RUB';
+          const toAmt = tx.toAmount ?? tx.amount;
+          incomeByCurrency[toCur] = (incomeByCurrency[toCur] ?? 0) + toAmt;
+        }
+      }
+    });
+    const allCurrencies = [...new Set([...Object.keys(incomeByCurrency), ...Object.keys(expenseByCurrency)])].sort();
+    const netByCurrency: Record<string, number> = {};
+    allCurrencies.forEach(c => {
+      netByCurrency[c] = (incomeByCurrency[c] ?? 0) - (expenseByCurrency[c] ?? 0);
+    });
+    return { count: displayedTransactions.length, incomeByCurrency, expenseByCurrency, netByCurrency, allCurrencies };
+  }, [displayedTransactions, state.wallets]);
   
-  // Данные для модального окна категории
+  // Данные для модального окна категории (включая переводы для «Перевод»)
   const categoryDetails = useMemo(() => {
     if (!selectedCategory) return null;
-    
     const categoryTxs = filteredTransactions.filter(
-      tx => tx.category === selectedCategory && tx.type === 'expense'
+      tx => tx.category === selectedCategory && (tx.type === 'expense' || tx.type === 'transfer')
     );
-    
+    const byCurrency: Record<string, number> = {};
+    categoryTxs.forEach(tx => {
+      const c = getTxCurrency(tx);
+      byCurrency[c] = (byCurrency[c] ?? 0) + tx.amount;
+    });
     const total = categoryTxs.reduce((sum, tx) => sum + tx.amount, 0);
     const count = categoryTxs.length;
     const avgCheck = count > 0 ? total / count : 0;
-    const percent = totals.expense > 0 ? Math.round((total / totals.expense) * 100) : 0;
-    
-    // Подсчёт частоты
+    const primaryExp = totals.expenseByCurrency[primaryCurrency] ?? 0;
+    const primaryCat = byCurrency[primaryCurrency] ?? 0;
+    const percent = primaryExp > 0 ? Math.round((primaryCat / primaryExp) * 100) : 0;
+
     const uniqueDays = new Set(categoryTxs.map(tx => tx.date)).size;
     const periodDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
     const frequencyPerWeek = Math.round((uniqueDays / periodDays) * 7 * 10) / 10;
-    
-    // Сравнение с прошлым периодом
+
     const prevCategoryTxs = prevTransactions.filter(
-      tx => tx.category === selectedCategory && tx.type === 'expense'
+      tx => tx.category === selectedCategory && (tx.type === 'expense' || tx.type === 'transfer')
     );
     const prevTotal = prevCategoryTxs.reduce((sum, tx) => sum + tx.amount, 0);
     const change = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : (total > 0 ? 100 : 0);
-    
+
     return {
       name: selectedCategory,
       total,
+      byCurrency,
       count,
       avgCheck,
       percent,
@@ -551,7 +640,7 @@ export function AnalyticsPage() {
       change,
       transactions: categoryTxs.slice(0, 10)
     };
-  }, [selectedCategory, filteredTransactions, prevTransactions, totals.expense, startDate, endDate]);
+  }, [selectedCategory, filteredTransactions, prevTransactions, totals.expenseByCurrency, primaryCurrency, startDate, endDate, state.wallets]);
 
   return (
     <Layout 
@@ -602,43 +691,74 @@ export function AnalyticsPage() {
             )}
           </div>
           
-          {/* Сводка */}
+          {/* Сводка по валютам */}
           <div className="summary-block">
             <div className="summary-item income">
               <span className="summary-label">Доходы</span>
-              <span className="summary-value">{formatMoney(totals.income)}</span>
-              {periodType !== 'all' && changes.income !== 0 && (
-                <span className={`summary-change ${changes.income >= 0 ? 'positive' : 'negative'}`}>
-                  {changes.income >= 0 ? '+' : ''}{changes.income}%
-                </span>
-              )}
+              <div className="summary-values">
+                {totals.allCurrencies.map(c => {
+                  const v = totals.incomeByCurrency[c] ?? 0;
+                  const ch = changes.income[c] ?? 0;
+                  if (v === 0 && ch === 0) return null;
+                  return (
+                    <span key={c} className="summary-value-wrap">
+                      <span className="summary-value">{formatMoney(v, c)}</span>
+                      {periodType !== 'all' && ch !== 0 && (
+                        <span className={`summary-change ${ch >= 0 ? 'positive' : 'negative'}`}>{ch >= 0 ? '+' : ''}{ch}%</span>
+                      )}
+                    </span>
+                  );
+                })}
+                {totals.allCurrencies.length === 0 && <span className="summary-value">—</span>}
+              </div>
             </div>
-            
             <div className="summary-item expense">
               <span className="summary-label">Расходы</span>
-              <span className="summary-value">{formatMoney(totals.expense)}</span>
-              {periodType !== 'all' && changes.expense !== 0 && (
-                <span className={`summary-change ${changes.expense <= 0 ? 'positive' : 'negative'}`}>
-                  {changes.expense >= 0 ? '+' : ''}{changes.expense}%
-                </span>
-              )}
+              <div className="summary-values">
+                {totals.allCurrencies.map(c => {
+                  const v = totals.expenseByCurrency[c] ?? 0;
+                  const ch = changes.expense[c] ?? 0;
+                  if (v === 0 && ch === 0) return null;
+                  return (
+                    <span key={c} className="summary-value-wrap">
+                      <span className="summary-value">{formatMoney(v, c)}</span>
+                      {periodType !== 'all' && ch !== 0 && (
+                        <span className={`summary-change ${ch <= 0 ? 'positive' : 'negative'}`}>
+                          {ch >= 0 ? '+' : ''}{ch}%
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
+                {totals.allCurrencies.length === 0 && <span className="summary-value">—</span>}
+              </div>
             </div>
-            
-            <div className={`summary-item net ${totals.net >= 0 ? 'positive' : 'negative'}`}>
+            <div className={`summary-item net ${primaryNet >= 0 ? 'positive' : 'negative'}`}>
               <span className="summary-label">Итог</span>
-              <span className="summary-value">
-                {totals.net >= 0 ? '+' : ''}{formatMoney(totals.net)}
-              </span>
+              <div className="summary-values">
+                {totals.allCurrencies.map(c => {
+                  const v = totals.netByCurrency[c] ?? 0;
+                  if (v === 0) return null;
+                  return (
+                    <span key={c} className="summary-value-wrap">
+                      <span className="summary-value">{v >= 0 ? '+' : ''}{formatMoney(v, c)}</span>
+                    </span>
+                  );
+                })}
+                {totals.allCurrencies.length === 0 && <span className="summary-value">—</span>}
+              </div>
             </div>
           </div>
           
-          {/* Шкала */}
-          <div className="ratio-bar">
-            <div className="ratio-bar-fill" style={{ width: `${expenseRatio}%` }} />
-            <span className="ratio-bar-label">
-              {expenseRatio}% доходов потрачено
-            </span>
-          </div>
+          {/* Шкала (по базовой валюте) */}
+          {primaryInc > 0 && (
+            <div className="ratio-bar">
+              <div className="ratio-bar-fill" style={{ width: `${expenseRatio}%` }} />
+              <span className="ratio-bar-label">
+                {expenseRatio}% доходов потрачено
+              </span>
+            </div>
+          )}
         </div>
         
         {/* Фильтры */}
@@ -685,14 +805,54 @@ export function AnalyticsPage() {
         
         {/* График динамики */}
         <div className="analytics-card chart-card">
-          <h3 className="card-title">Динамика по времени</h3>
+          <div className="chart-header-row">
+            <h3 className="card-title">Динамика по времени</h3>
+            {totals.allCurrencies.length > 1 && (
+              <div className="chart-currency-dropdown" ref={chartCurrencyRef}>
+                <button
+                  type="button"
+                  className={`chart-currency-trigger ${chartCurrencyOpen ? 'open' : ''}`}
+                  onClick={() => setChartCurrencyOpen(!chartCurrencyOpen)}
+                  aria-expanded={chartCurrencyOpen}
+                  aria-haspopup="listbox"
+                  aria-label="Выбор валюты графика"
+                >
+                  <span className="chart-currency-value">
+                    {CURRENCY_SYMBOLS[chartCurrency as keyof typeof CURRENCY_SYMBOLS] || chartCurrency}
+                  </span>
+                  <svg className="chart-currency-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {chartCurrencyOpen && (
+                  <div className="chart-currency-menu" role="listbox">
+                    {totals.allCurrencies.map(c => (
+                      <button
+                        key={c}
+                        type="button"
+                        role="option"
+                        aria-selected={c === chartCurrency}
+                        className={`chart-currency-option ${c === chartCurrency ? 'active' : ''}`}
+                        onClick={() => {
+                          setChartCurrency(c);
+                          setChartCurrencyOpen(false);
+                        }}
+                      >
+                        {CURRENCY_SYMBOLS[c as keyof typeof CURRENCY_SYMBOLS] || c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <div className="chart-container">
             <Line data={chartData} options={chartOptions} />
           </div>
           {mostExpensiveDay && (
             <div className="chart-insight">
               <span className="insight-icon">📊</span>
-              <span>Самый затратный день: <strong>{mostExpensiveDay.date}</strong> — {formatMoney(mostExpensiveDay.amount)}</span>
+              <span>Самый затратный день: <strong>{mostExpensiveDay.date}</strong> — {formatMoney(mostExpensiveDay.amount, mostExpensiveDay.currency)}</span>
             </div>
           )}
         </div>
@@ -709,7 +869,7 @@ export function AnalyticsPage() {
                 <div className="doughnut-wrapper">
                   <Doughnut data={doughnutData} options={doughnutOptions} />
                   <div className="doughnut-center">
-                    <span className="doughnut-total">{formatMoney(totals.expense)}</span>
+                    <span className="doughnut-total">{formatMoneyByCurrency(totals.expenseByCurrency)}</span>
                     <span className="doughnut-label">{expensesByCategory.length} категорий</span>
                   </div>
                 </div>
@@ -756,8 +916,8 @@ export function AnalyticsPage() {
             <span className="accounts-summary-value">
               {formatMoney(state.wallets.reduce((sum, w) => sum + w.balance, 0))}
             </span>
-            <span className={`accounts-summary-change ${totals.net >= 0 ? 'positive' : 'negative'}`}>
-              {totals.net >= 0 ? '+' : ''}{formatMoney(totals.net)} за период
+            <span className={`accounts-summary-change ${primaryNet >= 0 ? 'positive' : 'negative'}`}>
+              {formatNetByCurrency(totals.netByCurrency)} за период
             </span>
           </div>
           
@@ -904,10 +1064,10 @@ export function AnalyticsPage() {
           {displayedTransactions.length > 0 && (
             <div className="transactions-summary">
               <span>Операций: {displayedTotals.count}</span>
-              <span className="summary-income">+{formatMoney(displayedTotals.income)}</span>
-              <span className="summary-expense">-{formatMoney(displayedTotals.expense)}</span>
-              <span className={`summary-net ${displayedTotals.net >= 0 ? 'positive' : 'negative'}`}>
-                = {displayedTotals.net >= 0 ? '+' : ''}{formatMoney(displayedTotals.net)}
+              <span className="summary-income">{formatIncomeByCurrency(displayedTotals.incomeByCurrency)}</span>
+              <span className="summary-expense">{formatExpenseByCurrency(displayedTotals.expenseByCurrency)}</span>
+              <span className={`summary-net ${displayedTotals.allCurrencies.some(c => (displayedTotals.netByCurrency[c] ?? 0) < 0) ? 'negative' : 'positive'}`}>
+                = {formatNetByCurrency(displayedTotals.netByCurrency)}
               </span>
             </div>
           )}
@@ -941,13 +1101,13 @@ export function AnalyticsPage() {
           <div className="category-detail-modal">
             <div className="detail-summary">
               <div className="detail-main-value">
-                <span className="detail-amount">{formatMoney(categoryDetails.total)}</span>
+                <span className="detail-amount">{formatMoneyByCurrency(categoryDetails.byCurrency)}</span>
                 <span className="detail-percent">{categoryDetails.percent}% от расходов</span>
               </div>
               
               <div className="detail-stats">
                 <div className="detail-stat">
-                  <span className="stat-value">{formatMoney(categoryDetails.avgCheck)}</span>
+                  <span className="stat-value">{categoryDetails.count ? formatMoney((categoryDetails.byCurrency[primaryCurrency] ?? 0) / categoryDetails.count, primaryCurrency) : '—'}</span>
                   <span className="stat-label">Средний чек</span>
                 </div>
                 <div className="detail-stat">

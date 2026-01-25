@@ -148,6 +148,20 @@
   letter-spacing: 0.5px;
 }
 
+.summary-values {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.summary-value-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
 .summary-value {
   font-size: 16px;
   font-weight: 700;
@@ -326,6 +340,117 @@
 
 .chart-card {
   padding: 16px;
+}
+
+.chart-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-header-row .card-title {
+  margin-bottom: 0;
+}
+
+/* Кастомный выпадающий список валюты графика */
+.chart-currency-dropdown {
+  position: relative;
+}
+
+.chart-currency-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chart-currency-trigger:hover {
+  border-color: var(--accent);
+}
+
+.chart-currency-trigger:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.chart-currency-trigger.open {
+  border-color: var(--accent);
+}
+
+.chart-currency-value {
+  flex-shrink: 0;
+}
+
+.chart-currency-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.chart-currency-trigger.open .chart-currency-chevron {
+  transform: rotate(180deg);
+}
+
+.chart-currency-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  overflow: hidden;
+  animation: chartCurrencyMenuIn 0.2s ease;
+}
+
+@keyframes chartCurrencyMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chart-currency-option {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.chart-currency-option:hover {
+  background: var(--bg-secondary);
+}
+
+.chart-currency-option.active {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .chart-container {
