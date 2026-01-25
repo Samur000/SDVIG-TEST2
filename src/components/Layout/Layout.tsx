@@ -7,6 +7,7 @@ interface LayoutProps {
   title?: string;
   subtitle?: string;
   showHeader?: boolean;
+  headerLeft?: ReactNode;
   headerRight?: ReactNode;
 }
 
@@ -15,6 +16,7 @@ export function Layout({
   title, 
   subtitle,
   showHeader = true,
+  headerLeft,
   headerRight
 }: LayoutProps) {
   return (
@@ -22,6 +24,7 @@ export function Layout({
       {showHeader && (
         <header className="header">
           <div className="header-content">
+            {headerLeft && <div className="header-left">{headerLeft}</div>}
             {title ? (
               <div className="header-title-section">
                 <h1 className="header-title">{title}</h1>

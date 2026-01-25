@@ -485,7 +485,7 @@ export function AnalyticsPage() {
       const query = searchQuery.toLowerCase();
       txs = txs.filter(tx => 
         tx.category.toLowerCase().includes(query) ||
-        (tx.description && tx.description.toLowerCase().includes(query)) ||
+        (tx.comment && tx.comment.toLowerCase().includes(query)) ||
         tx.amount.toString().includes(query)
       );
     }
@@ -878,7 +878,7 @@ export function AnalyticsPage() {
                     </div>
                     <div className="tx-details">
                       <span className="tx-category-name">{tx.category}</span>
-                      {tx.description && <span className="tx-description">{tx.description}</span>}
+                      {tx.comment && <span className="tx-description">{tx.comment}</span>}
                     </div>
                     <div className="tx-meta">
                       <span className={`tx-amount-full ${tx.type}`}>
@@ -978,7 +978,7 @@ export function AnalyticsPage() {
                     return (
                       <div key={tx.id} className="detail-tx-row">
                         <div className="detail-tx-info">
-                          <span className="detail-tx-desc">{tx.description || 'Без описания'}</span>
+                          <span className="detail-tx-desc">{tx.comment || 'Без описания'}</span>
                           <span className="detail-tx-date">
                             {new Date(tx.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                             {wallet && ` · ${wallet.name}`}
