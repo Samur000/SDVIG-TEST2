@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
 import { TextSelection } from 'prosemirror-state';
 import { Idea, Folder } from '../../types';
 import { Navigation } from '../../components/Layout/Navigation';
@@ -41,6 +42,7 @@ export function NoteEditor({
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const [clickedLinkUrl, setClickedLinkUrl] = useState('');
+  const savedLinkSelectionRef = useRef<{ from: number; to: number } | null>(null);
   const [pageVisible, setPageVisible] = useState(false); // Для анимации появления страницы
   const editorRef = useRef<HTMLDivElement>(null);
   const { isVisible: keyboardVisible, height: keyboardHeight } = useKeyboard();
@@ -200,13 +202,13 @@ export function NoteEditor({
         paragraph: {
           HTMLAttributes: { class: 'note-editor-paragraph' }
         },
-        // ✅ ОТКЛЮЧАЕМ дубликаты из StarterKit
-        link: false,        // StarterKit уже содержит
-        underline: false    // StarterKit уже содержит
+        link: false,
+        underline: false,
       }),
-      // ✅ УДАЛИ эти строки:
-      // Underline,
-      // Link.configure({...}),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+      }),
       Checkbox
     ],
     content: convertToHtml(idea),
@@ -576,35 +578,43 @@ export function NoteEditor({
   const setLink = () => {
     if (!editor) return;
     
-    // Проверяем, есть ли выделенный текст
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to);
+    const hasSelection = from !== to;
     
-    // Сохраняем выделенный текст
+    if (hasSelection) {
+      savedLinkSelectionRef.current = { from, to };
+    } else {
+      savedLinkSelectionRef.current = null;
+    }
     setLinkText(selectedText || '');
     setLinkUrl('');
     setShowLinkModal(true);
   };
 
-  const handleLinkSubmit = () => {
-    if (!editor || !linkUrl.trim()) return;
-    
-    // Проверяем, есть ли выделенный текст
-    const { from, to } = editor.state.selection;
-    const selectedText = editor.state.doc.textBetween(from, to);
-    
-    if (selectedText.trim()) {
-      // Если текст выделен, создаем ссылку на выделенном тексте
-      editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl.trim() }).run();
-    } else {
-      // Если текст не выделен, используем введенный текст или URL
-      const text = linkText.trim() || linkUrl.trim() || 'Ссылка';
-      editor.chain().focus().insertContent(`<a href="${linkUrl.trim()}">${text}</a>`).run();
-    }
-    
+  const closeLinkModal = useCallback(() => {
     setShowLinkModal(false);
     setLinkUrl('');
     setLinkText('');
+    savedLinkSelectionRef.current = null;
+  }, []);
+
+  const handleLinkSubmit = () => {
+    if (!editor || !linkUrl.trim()) return;
+    
+    const href = linkUrl.trim();
+    const sel = savedLinkSelectionRef.current;
+    
+    if (sel && sel.from !== sel.to) {
+      // Восстанавливаем сохранённое выделение и делаем из него ссылку
+      editor.chain().focus().setTextSelection(sel).setLink({ href }).run();
+    } else {
+      // Текст не был выделен — вставляем ссылку как новый контент
+      const text = linkText.trim() || href || 'Ссылка';
+      editor.chain().focus().insertContent(`<a href="${escapeHtml(href)}">${escapeHtml(text)}</a>`).run();
+    }
+    
+    closeLinkModal();
     editor.commands.focus();
   };
 
@@ -1088,11 +1098,7 @@ export function NoteEditor({
       {/* Модалка для ввода ссылки */}
       <Modal
         isOpen={showLinkModal}
-        onClose={() => {
-          setShowLinkModal(false);
-          setLinkUrl('');
-          setLinkText('');
-        }}
+        onClose={closeLinkModal}
         title="Вставьте ссылку"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1114,7 +1120,7 @@ export function NoteEditor({
               }}
             />
           </div>
-          {!editor?.state.selection.empty && (
+          {savedLinkSelectionRef.current && savedLinkSelectionRef.current.from !== savedLinkSelectionRef.current.to && (
             <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
               Выделенный текст будет превращен в ссылку
             </div>
@@ -1123,11 +1129,7 @@ export function NoteEditor({
             <button
               type="button"
               className="btn"
-              onClick={() => {
-                setShowLinkModal(false);
-                setLinkUrl('');
-                setLinkText('');
-              }}
+              onClick={closeLinkModal}
             >
               Отмена
             </button>
@@ -1143,17 +1145,18 @@ export function NoteEditor({
         </div>
       </Modal>
 
-      {/* Модалка подтверждения перехода по ссылке */}
+      {/* Модалка подтверждения перехода по ссылке (по центру, как «Сохранить изменения?») */}
       <Modal
         isOpen={showLinkConfirmModal}
         onClose={() => {
           setShowLinkConfirmModal(false);
           setClickedLinkUrl('');
         }}
-        title="Перейти по ссылке"
+        title="Перейти по ссылке?"
+        variant="center"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <p style={{ margin: 0, color: 'var(--text-primary)' }}>
+          <p style={{ margin: 0, color: 'var(--muted)', textAlign: 'center' }}>
             Вы собираетесь перейти по ссылке:
           </p>
           <div style={{ 
@@ -1162,7 +1165,8 @@ export function NoteEditor({
             borderRadius: 'var(--radius-md)',
             wordBreak: 'break-all',
             fontSize: '14px',
-            color: 'var(--accent)'
+            color: 'var(--accent)',
+            textAlign: 'center'
           }}>
             {clickedLinkUrl}
           </div>

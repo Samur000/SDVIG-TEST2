@@ -7,6 +7,7 @@ interface ModalProps {
   title?: string;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'full';
+  variant?: 'bottom' | 'center';
   hasChanges?: boolean;
   onSave?: () => void;
   onRequestClose?: () => void;
@@ -19,6 +20,7 @@ export function Modal({
   title, 
   children, 
   size = 'md',
+  variant = 'bottom',
   hasChanges = false,
   onSave,
   onRequestClose,
@@ -85,9 +87,9 @@ export function Modal({
 
   return (
     <>
-      <div className="modal-overlay" onClick={handleCloseClick}>
+      <div className={`modal-overlay ${variant === 'center' ? 'modal-overlay--center' : ''}`} onClick={handleCloseClick}>
         <div 
-          className={`modal-content modal-${size}`}
+          className={`modal-content modal-${size} ${variant === 'center' ? 'modal-content--center' : ''}`}
           onClick={e => e.stopPropagation()}
         >
           {title && (
