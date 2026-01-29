@@ -36,7 +36,7 @@ import {
 const INSTALL_PROMPT_SHOWN_FLAG = 'sdvig_install_prompt_shown';
 
 // Текущая версия приложения и флаг для показа модалки "Что нового"
-const APP_VERSION = '2.1.1';
+const APP_VERSION = '2.1.2';
 const WHATS_NEW_SHOWN_FLAG = 'sdvig_whats_new_shown_version';
 
 // Проверка, запущено ли приложение как PWA (standalone)

@@ -407,14 +407,14 @@ export function RoutineAnalyticsPage() {
       if (totalMisses > 10) {
         return {
           icon: '⚠️',
-          text: `Критично! ${totalMisses} пропусков. Больше всего по ${getDayNameDativePlural(worstDay)}`,
+          text: `Критично! Пропусков ${totalMisses}. Больше всего по ${getDayNameDativePlural(worstDay)}`,
           variant: 'danger' as const,
           skipCount: totalMisses
         };
       } else if (totalMisses > 5) {
         return {
           icon: '😓',
-          text: `${totalMisses} пропусков. Больше всего по ${getDayNameDativePlural(worstDay)}`,
+          text: `Пропусков ${totalMisses}. Больше всего по ${getDayNameDativePlural(worstDay)}`,
           variant: 'warning' as const,
           skipCount: totalMisses
         };
@@ -432,14 +432,14 @@ export function RoutineAnalyticsPage() {
     if (worstRoutine.missed > 10) {
       return {
         icon: '⚠️',
-        text: `«${worstRoutine.routine.title}» критично — ${worstRoutine.missed} пропусков, выполнено только ${worstRoutine.percent}%`,
+        text: `«${worstRoutine.routine.title}» критично — пропусков ${worstRoutine.missed} , выполнено только ${worstRoutine.percent}%`,
         variant: 'danger' as const,
         skipCount: worstRoutine.missed
       };
     } else if (worstRoutine.missed > 5) {
       return {
         icon: '🔶',
-        text: `«${worstRoutine.routine.title}» требует внимания — ${worstRoutine.missed} пропусков, выполнено только ${worstRoutine.percent}%`,
+        text: `«${worstRoutine.routine.title}» требует внимания — пропусков ${worstRoutine.missed}, выполнено только ${worstRoutine.percent}%`,
         variant: 'warning' as const,
         skipCount: worstRoutine.missed
       };
@@ -534,7 +534,7 @@ export function RoutineAnalyticsPage() {
         
         {/* Список рутин */}
         <div className="routines-section">
-          <h3 className="section-title">Пропуски</h3>
+          <h3 className="section-title">Успеваемость</h3>
           
           {routineStats.length === 0 ? (
             <div className="empty-state">
@@ -551,7 +551,7 @@ export function RoutineAnalyticsPage() {
                 >
                   <div className="routine-info">
                     <span className="routine-title">{routine.title}</span>
-                    <span className="routine-missed">{missed} пропусков</span>
+                    <span className="routine-missed">Пропусков {missed}</span>
                   </div>
                   <div className="routine-stats">
                     <span className={`routine-percent ${status}`}>{percent}%</span>
@@ -643,7 +643,7 @@ export function RoutineAnalyticsPage() {
                 </span>
                 <span className="insight-text">
                   {routineDetails.missed > 10 
-                    ? `Критично! ${routineDetails.missed} пропусков. Чаще всего пропускается по ${getDayNameDativePlural(routineDetails.worstDay)}`
+                    ? `Критично! Пропусков ${routineDetails.missed}. Чаще всего пропускается по ${getDayNameDativePlural(routineDetails.worstDay)}`
                     : routineDetails.missed > 5
                     ? `${routineDetails.missed} пропусков. Чаще всего пропускается по ${getDayNameDativePlural(routineDetails.worstDay)}`
                     : `Чаще всего пропускается по ${getDayNameDativePlural(routineDetails.worstDay)}`

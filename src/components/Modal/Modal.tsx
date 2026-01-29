@@ -1,17 +1,22 @@
 import { ReactNode, useEffect, useState } from 'react';
 import './Modal.css';
 
+export interface ModalRequestCloseContext {
+  requestClose: () => void; // То же поведение, что крестик/оверлей (при hasChanges покажет подтверждение)
+}
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
-  children: ReactNode;
+  children: ReactNode | ((ctx: ModalRequestCloseContext) => ReactNode);
   size?: 'sm' | 'md' | 'lg' | 'full';
   variant?: 'bottom' | 'center';
   hasChanges?: boolean;
   onSave?: () => void;
   onRequestClose?: () => void;
   confirmMessage?: string; // Кастомное сообщение для модалки подтверждения (например, "настроек стартовой страницы")
+  onDiscard?: () => void; // Вызывается при выборе "Не сохранять" (например, для тоста)
 }
 
 export function Modal({ 
@@ -24,7 +29,8 @@ export function Modal({
   hasChanges = false,
   onSave,
   onRequestClose,
-  confirmMessage
+  confirmMessage,
+  onDiscard
 }: ModalProps) {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   
@@ -65,7 +71,7 @@ export function Modal({
   
   const handleDiscard = () => {
     setShowDiscardConfirm(false);
-    // Всегда закрываем основную модалку напрямую через onClose
+    onDiscard?.();
     onClose();
   };
   
@@ -115,7 +121,7 @@ export function Modal({
             </div>
           )}
           <div className="modal-body">
-            {children}
+            {typeof children === 'function' ? children({ requestClose: handleCloseClick }) : children}
           </div>
         </div>
       </div>

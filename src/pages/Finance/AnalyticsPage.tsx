@@ -4,6 +4,7 @@ import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
 import { useApp } from '../../store/AppContext';
 import { CURRENCY_SYMBOLS } from '../../types';
+import { formatDate, parseDate } from '../../utils/date';
 import { WalletIconSVG } from './WalletForm';
 import {
   Chart as ChartJS,
@@ -327,7 +328,7 @@ export function AnalyticsPage() {
     end.setHours(23, 59, 59, 999);
 
     while (current <= end) {
-      const dateStr = current.toISOString().split('T')[0];
+      const dateStr = formatDate(current);
       daysInPeriod[dateStr] = { income: 0, expense: 0 };
       current.setDate(current.getDate() + 1);
     }
@@ -336,7 +337,7 @@ export function AnalyticsPage() {
 
     const sortedDates = Object.keys(daysInPeriod).sort();
     const labels = sortedDates.map(d => {
-      const date = new Date(d);
+      const date = parseDate(d);
       return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
     });
 

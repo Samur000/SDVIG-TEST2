@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Layout } from '../../components/Layout';
 import { Modal } from '../../components/Modal';
 import { Checkbox, EmptyState, useToast } from '../../components/UI';
@@ -14,17 +14,83 @@ import './TasksPage.css';
 
 type TabType = 'todo' | 'habits';
 
+export type TaskSortType =
+  | 'time-asc'   // по времени (возрастание)
+  | 'time-desc'  // по времени (убывание)
+  | 'priority'   // по важности (сначала важные)
+  | 'name-asc'   // по названию (А–Я)
+  | 'name-desc'; // по названию (Я–А)
+
+const TASK_SORT_OPTIONS: { value: TaskSortType; label: string }[] = [
+  { value: 'time-asc', label: 'По времени (сначала старые)' },
+  { value: 'time-desc', label: 'По времени (сначала новые)' },
+  { value: 'priority', label: 'По важности (сначала важные)' },
+  { value: 'name-asc', label: 'По названию (А–Я)' },
+  { value: 'name-desc', label: 'По названию (Я–А)' },
+];
+
+const TASKS_SORT_STORAGE_KEY = 'sdvig_tasks_sort';
+const TASKS_EXPANDED_SUBTASKS_STORAGE_KEY = 'sdvig_tasks_expanded_subtasks';
+
+const VALID_SORT_VALUES: TaskSortType[] = ['time-asc', 'time-desc', 'priority', 'name-asc', 'name-desc'];
+
+function loadTaskSort(): TaskSortType {
+  try {
+    const saved = localStorage.getItem(TASKS_SORT_STORAGE_KEY);
+    if (saved && VALID_SORT_VALUES.includes(saved as TaskSortType)) return saved as TaskSortType;
+  } catch (_) {}
+  return 'time-desc';
+}
+
+function loadExpandedSubtasks(): Set<string> {
+  try {
+    const saved = localStorage.getItem(TASKS_EXPANDED_SUBTASKS_STORAGE_KEY);
+    if (saved) {
+      const arr = JSON.parse(saved) as unknown;
+      if (Array.isArray(arr) && arr.every((x): x is string => typeof x === 'string')) {
+        return new Set(arr);
+      }
+    }
+  } catch (_) {}
+  return new Set();
+}
+
+function sortTasks(tasks: Task[], sortType: TaskSortType): Task[] {
+  const arr = [...tasks];
+  switch (sortType) {
+    case 'time-asc':
+      return arr.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    case 'time-desc':
+      return arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    case 'priority':
+      return arr.sort((a, b) => {
+        if (a.priority === 'important' && b.priority !== 'important') return -1;
+        if (a.priority !== 'important' && b.priority === 'important') return 1;
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      });
+    case 'name-asc':
+      return arr.sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+    case 'name-desc':
+      return arr.sort((a, b) => b.title.localeCompare(a.title, 'ru'));
+    default:
+      return arr;
+  }
+}
+
 export function TasksPage() {
   const { state, dispatch } = useApp();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('todo');
+  const [taskSort, setTaskSort] = useState<TaskSortType>(loadTaskSort);
+  const [showTaskSortDropdown, setShowTaskSortDropdown] = useState(false);
+  const taskSortDropdownRef = useRef<HTMLDivElement>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showHabitModal, setShowHabitModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
   const [showArchive, setShowArchive] = useState(false);
-  const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
+  const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(loadExpandedSubtasks);
   const taskFormRef = useRef<TaskFormHandle>(null);
   const [taskFormHasChanges, setTaskFormHasChanges] = useState(false);
   
@@ -35,6 +101,32 @@ export function TasksPage() {
   const isInitialMount = useRef(true);
   
   const today = getToday();
+
+  // Закрытие выпадающего списка сортировки при клике вне
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (taskSortDropdownRef.current && !taskSortDropdownRef.current.contains(e.target as Node)) {
+        setShowTaskSortDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Сохранение сортировки в localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(TASKS_SORT_STORAGE_KEY, taskSort);
+    } catch (_) {}
+  }, [taskSort]);
+
+  // Сохранение раскрытых подзадач в localStorage
+  useEffect(() => {
+    try {
+      const arr = Array.from(expandedSubtasks);
+      localStorage.setItem(TASKS_EXPANDED_SUBTASKS_STORAGE_KEY, JSON.stringify(arr));
+    } catch (_) {}
+  }, [expandedSubtasks]);
   
   const toggleSubtasks = (taskId: string) => {
     setExpandedSubtasks(prev => {
@@ -124,16 +216,7 @@ export function TasksPage() {
     return `${days} дней`;
   };
   
-  // Сортировка по времени создания (новые первые)
-  const sortByCreatedAt = (tasks: Task[]): Task[] => {
-    return [...tasks].sort((a, b) => {
-      const timeA = a.createdAt || '';
-      const timeB = b.createdAt || '';
-      return timeB.localeCompare(timeA);
-    });
-  };
-  
-  // Группировка задач (только невыполненные)
+  // Группировка задач (только невыполненные) с учётом выбранной сортировки
   const groupedTasks = useMemo(() => {
     const todayTasks: Task[] = [];
     const weekTasks: Task[] = [];
@@ -153,18 +236,19 @@ export function TasksPage() {
     });
     
     return { 
-      todayTasks: sortByCreatedAt(todayTasks), 
-      weekTasks: sortByCreatedAt(weekTasks), 
-      somedayTasks: sortByCreatedAt(somedayTasks) 
+      todayTasks: sortTasks(todayTasks, taskSort), 
+      weekTasks: sortTasks(weekTasks, taskSort), 
+      somedayTasks: sortTasks(somedayTasks, taskSort) 
     };
-  }, [state.tasks, today]);
+  }, [state.tasks, today, taskSort]);
   
-  // Архив выполненных задач
+  // Архив выполненных задач с учётом сортировки
   const archivedTasks = useMemo(() => {
-    return sortByCreatedAt(
-      state.tasks.filter(task => !task.parentId && task.completed)
+    return sortTasks(
+      state.tasks.filter(task => !task.parentId && task.completed),
+      taskSort
     );
-  }, [state.tasks]);
+  }, [state.tasks, taskSort]);
   
   // Подзадачи для задачи
   const getSubtasks = (taskId: string) => 
@@ -431,6 +515,47 @@ export function TasksPage() {
             Добавить задачу
           </button>
           
+          {(hasActiveTasks || archivedTasks.length > 0) && (
+            <div className="task-sort-wrapper" ref={taskSortDropdownRef}>
+              <button
+                type="button"
+                className="task-sort-trigger"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowTaskSortDropdown(!showTaskSortDropdown);
+                }}
+              >
+                <span className="task-sort-label">Сортировка:</span>
+                <span className="task-sort-value">
+                  {TASK_SORT_OPTIONS.find(o => o.value === taskSort)?.label ?? taskSort}
+                </span>
+                <svg className="task-sort-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              {showTaskSortDropdown && (
+                <div className="task-sort-dropdown" onMouseDown={(e) => e.stopPropagation()}>
+                  {TASK_SORT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`task-sort-item ${taskSort === opt.value ? 'active' : ''}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setTaskSort(opt.value);
+                        setShowTaskSortDropdown(false);
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
           {!hasActiveTasks && archivedTasks.length === 0 ? (
             <EmptyState
               title="Нет задач"
@@ -595,6 +720,7 @@ export function TasksPage() {
           existingSubtasks={getSubtasks(breakdownTask.id)}
           onSave={handleBreakdown}
           onClose={() => setBreakdownTask(null)}
+          onDiscard={() => showToast('Данные не сохранены')}
         />
       )}
     </Layout>
